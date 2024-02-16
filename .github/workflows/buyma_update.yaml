@@ -1,0 +1,41 @@
+name: buyma_update
+
+on:
+  # push:
+  #   branches: 
+  #     - main
+
+  workflow_dispatch:
+
+  schedule:
+    - cron: '5,15,25,35,45,55 * * * *'  # テスト用に10分おきに実行
+#   - cron: '05 15 * * *'  # UTC=15:05 日本時間=0:05
+
+jobs:
+  update-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440   # タイムアウト24時間(デフォルトが6時間なので延ばす)
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+
+        run:
+          pip install webdriver-manager
+          pip install gspread
+          pip install oauth2client
+          pip install google-api-python-client
+          pip install -r requirements.txt
+          pip install pytz
+          pip install pandas
+
+      - name: Run Python
+
+        run:
+          python get_data_update.py
