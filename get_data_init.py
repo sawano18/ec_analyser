@@ -27,6 +27,8 @@ def get_data_init():
             state = row['state']            # 状態
             ss_name = row['sheet_name']     # スプレッドシート名
 
+            set_ss_value(url_sheet, "操作", 13, 3, get_dt_str())
+
             # 状態が未取得, 取得中, エラーの場合に処理する
             if (state != GetDataStep.INIT_NONE.value and state != GetDataStep.INIT_ERROR.value and
                 state != GetDataStep.INIT_RUN_ORDER.value and state != GetDataStep.INIT_RUN_LIST.value and
@@ -39,10 +41,12 @@ def get_data_init():
             #--------------------------------------------------------------------------------
             print_ex('[1]注文実績初回取得 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_RUN_ORDER.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_RUN_ORDER.value)
 
             # 注文実績→CSVファイル
             if get_order_data(get_dt_str(), url_order) == False:
                 set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_ERROR.value)
+                set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_ERROR.value)
                 continue
             
             # CSVファイルから読込み
@@ -74,6 +78,7 @@ def get_data_init():
             #--------------------------------------------------------------------------------
             print_ex('[2]出品データ初回取得(リスト) 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_RUN_LIST.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_RUN_LIST.value)
 
             # 商品データ(リスト)取得
             get_item_list(url_item, FILE_PATH_ITEM, ITEM_COLS)
@@ -99,6 +104,7 @@ def get_data_init():
             #--------------------------------------------------------------------------------
             print_ex('[4]出品データ初回取得(詳細) 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_RUN_ITEM.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_RUN_ITEM.value)
 
             # 商品データ(詳細)取得
             result = False
@@ -117,6 +123,7 @@ def get_data_init():
             #--------------------------------------------------------------------------------
             print_ex('[5]市場データ初回取得 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_RUN_MARKET.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_RUN_MARKET.value)
 
             # 出品データ→市場データ用リスト
             item_to_market(url_sheet)
@@ -140,14 +147,17 @@ def get_data_init():
             set_ss_all_values(url_sheet, MARKET_SHEET_NAME, data)
 
             print_ex('[5]市場データ初回取得 終了 ' + ss_name)
-            set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_DONE.value)
-            set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_DATE, get_dt_str())
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
         set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_ERROR.value)
+        set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_ERROR.value)
         raise
 
+    set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.INIT_DONE.value)
+    set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.INIT_DONE.value)
+    set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_DATE, get_dt_str())
+    set_ss_value(url_sheet, "操作", 14, 3, get_dt_str())
     print_ex('初回データ取得 終了')
 
     return

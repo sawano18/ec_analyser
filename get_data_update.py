@@ -30,6 +30,8 @@ def get_data_update():
             state = row['state']            # 状態
             ss_name = row['sheet_name']     # スプレッドシート名
 
+            set_ss_value(url_sheet, "操作", 13, 3, get_dt_str())
+
             # 状態が未取得, 取得中, エラーの場合に処理する
             if (state != GetDataStep.INIT_DONE.value and state != GetDataStep.UPDATE_ERROR.value and
                 state != GetDataStep.UPDATE_DONE.value and
@@ -42,10 +44,12 @@ def get_data_update():
             #--------------------------------------------------------------------------------
             print_ex('[1]注文実績更新 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_RUN_ORDER.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_RUN_ORDER.value)
 
             # 注文実績→CSVファイル
             if get_order_data(get_dt_str(), url_order) == False:
                 set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_ERROR.value)
+                set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_ERROR.value)
                 continue
 
             # 前回取得データの最新日時を取得
@@ -83,6 +87,7 @@ def get_data_update():
             #--------------------------------------------------------------------------------
             print_ex('[2]出品データ更新 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_RUN_LIST.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_RUN_LIST.value)
 
             # 差分比較用リスト取得
             get_item_list(url_item, FILE_PATH_LIST, ITEM_COLS)
@@ -126,6 +131,7 @@ def get_data_update():
             #--------------------------------------------------------------------------------
             print_ex('[3]増加した出品データ取得 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_RUN_ITEM.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_RUN_ITEM.value)
 
             # 商品データ(詳細)取得
             result = False
@@ -143,6 +149,8 @@ def get_data_update():
             #--------------------------------------------------------------------------------
             print_ex('[4]市場データ更新 開始 ' + ss_name)
             set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_RUN_MARKET.value)
+            set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_RUN_MARKET.value)
+
 
             # 出品データ→市場データ用リスト
             item_to_market(url_sheet)
@@ -167,14 +175,17 @@ def get_data_update():
             set_ss_all_values(url_sheet, MARKET_SHEET_NAME, data)
 
             print_ex('[4]市場データ更新 終了 ' + ss_name)
-            set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_DONE.value)
-            set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_DATE, get_dt_str())
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
         set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_ERROR.value)
+        set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_ERROR.value)
         raise
 
+    set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_STATE, GetDataStep.UPDATE_DONE.value)
+    set_ss_value(url_sheet, "操作", 12, 3, GetDataStep.UPDATE_DONE.value)
+    set_ss_value(MANAGE_SS_URL, MANAGE_SS_NAME, MANAGE_ROW_START + i, MANAGE_COL_DATE, get_dt_str())
+    set_ss_value(url_sheet, "操作", 14, 3, get_dt_str())
     print_ex('出品データ更新 処理終了')
     
     return

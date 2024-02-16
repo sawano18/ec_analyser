@@ -3,3 +3,9 @@ __pycache__/
 login.json
 _backup/
 data/
+item.csv
+list_dec.csv
+list_inc.csv
+list.csv
+market.csv
+order.csv

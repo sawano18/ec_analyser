@@ -37,7 +37,7 @@ class GetDataStep(Enum):
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
 #MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1MLI2MJuwj42959gcM9JYm7a44hQ1Zy2LNkbgQrQV0h0/'
-MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1xPH9HHsLavqFE4G23Y3kfASYqKIH6SI336xJEpOHybY/'
+MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1oLh0o2Dh-ujktKTjRB3zQT5MmII9vulAvm-Mus0iKeQ'
 MANAGE_SS_NAME = 'シート1'
 
 MANAGE_ROW_START = 5
