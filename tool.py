@@ -1,19 +1,37 @@
 import csv
 import pytz
-import datetime
+from datetime import datetime, timedelta
+import threading
+
+lock = threading.Lock()
 
 #--------------------------------------------------------------------------------
 # 現在日時文字列
+# us: μ秒の出力可否
 #--------------------------------------------------------------------------------
-def get_dt_str():
+def get_dt_str(us=False):
+
     tz = pytz.timezone('Asia/Tokyo')
-    return datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S.%f")
+    if us:
+        return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S.%f")
+    else:
+        return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+
+#--------------------------------------------------------------------------------
+# 経過時間を表す文字列
+#--------------------------------------------------------------------------------
+def get_dt_diff_str(start, end):
+    time_diff = end - start
+    hours, remainder = divmod(time_diff.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return '{:02}:{:02}:{:02}'.format(hours, minutes, seconds)
 
 #--------------------------------------------------------------------------------
 # 現在日時付きprint出力
 #--------------------------------------------------------------------------------
 def print_ex(message):
-    print(get_dt_str() + ',' + message)
+    with lock:    
+        print(get_dt_str(us=True) + ',' + message)
 
 #--------------------------------------------------------------------------------
 # CSVファイル→二次元配列

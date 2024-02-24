@@ -1,19 +1,14 @@
-name: buyma_update
+name: ec_analyser
 
 on:
-  # push:
-  #   branches: 
-  #     - main
-
   workflow_dispatch:
 
-  schedule:
-   - cron: '00 18 * * *'  # UTC=18:00 日本時間=3:00
-
+  #schedule:
+  # - cron: '00 18 * * *'  # UTC=18:00 日本時間=3:00
+  
 jobs:
-  update-run:
+  main-run:
     runs-on: ubuntu-latest
-    timeout-minutes: 1440   # タイムアウト24時間(デフォルトが6時間なので延ばす)
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python
@@ -37,4 +32,4 @@ jobs:
       - name: Run Python
 
         run:
-          python get_data_update.py
+          python get_data_init.py

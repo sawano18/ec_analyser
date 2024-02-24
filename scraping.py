@@ -2,18 +2,35 @@ import os
 import re
 import math
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from tool import *
 from google_api import *
 from web_driver import *
 from enum import Enum
+from threading import Thread
+import glob
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+
 
 # パス関連
 if os.getenv('GITHUB_ACTIONS') == 'true':
     base_dir = os.getenv('GITHUB_WORKSPACE')
 else:
-    base_dir = os.path.abspath(os.curdir)
+    WORK_DIR_NAME = 'work'
+    base_dir = os.path.join(os.path.abspath(os.curdir), WORK_DIR_NAME)
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+
+#--------------------------------------------------------------------------------
+# 平行化
+#--------------------------------------------------------------------------------
+THREAD_MAX_ORDER = 10
+THREAD_MAX_LIST = 10
+THREAD_MAX_DETAIL = 16
+THREAD_MAX_MARKET = 16
 
 #--------------------------------------------------------------------------------
 # 処理状態
@@ -22,6 +39,7 @@ class GetDataStep(Enum):
     INIT_NONE = '初回データ取得予約'
     INIT_RUN_ORDER = '初回取得中(注文実績)'
     INIT_RUN_LIST = '初回取得中(出品リスト)'
+    INIT_RUN_CHECK = '初回取得中(出品リスト確認)'
     INIT_RUN_ITEM = '初回取得中(出品データ)'
     INIT_RUN_MARKET = '初回取得中(市場データ)'
     INIT_DONE = '初回取得済'
@@ -37,12 +55,26 @@ class GetDataStep(Enum):
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
 #MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1MLI2MJuwj42959gcM9JYm7a44hQ1Zy2LNkbgQrQV0h0/'
-MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1oLh0o2Dh-ujktKTjRB3zQT5MmII9vulAvm-Mus0iKeQ'
-MANAGE_SS_NAME = 'シート1'
+#MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1oLh0o2Dh-ujktKTjRB3zQT5MmII9vulAvm-Mus0iKeQ/'
+#MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/'
+    
+MANAGE_SS_URL = [
+    'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/',
+    'https://docs.google.com/spreadsheets/d/1JZKyB-bRqIE1kcLbCHjTLg2XB-6OTaGgIMrEUQtW2Uc/'
+]
+
+MANAGE_SS_NAME = '管理'
 
 MANAGE_ROW_START = 5
 MANAGE_COL_STATE = 5
-MANAGE_COL_DATE = 6
+MANAGE_COL_START_DT = 6
+MANAGE_COL_END_DT = 7
+MANAGE_COL_TIME = 8
+
+MANAGE_COL_INIT_TOTAL = 9
+MANAGE_COL_INIT_STEP = 10
+MANAGE_COL_UPDATE_TOTAL = 15
+MANAGE_COL_UPDATE_STEP = 16
 
 MANAGE_COLS = [
         'sheet_url',    # スプレッドURL
@@ -56,77 +88,149 @@ MANAGE_COLS = [
     ]
 
 #--------------------------------------------------------------------------------
+# 分析シート - 操作
+#--------------------------------------------------------------------------------
+OPE_SHEET_NAME = '操作'
+OPE_COL_VALUE = 3
+OPE_ROW_STATE = 12
+OPE_ROW_START_DT = 13
+OPE_ROW_END_DT = 14
+OPE_ROW_TIME = 15
+
+#--------------------------------------------------------------------------------
 # 出品データリスト(差分比較用)
 #--------------------------------------------------------------------------------
 LIST_ROW_START = 2              # スプレッドシートの開始行
 ITEM_COUNT_PER_PAGE = 80        # 1ページ当たりの商品数
 
 # 出品データCSVファイル
-FILE_LIST_CSV = 'list.csv'
-FILE_PATH_LIST = os.path.join(base_dir, FILE_LIST_CSV)
+FILE_PATH_LIST = os.path.join(base_dir, 'list.csv')
+FILE_PATH_LIST_INC = os.path.join(base_dir, 'list_inc.csv')
+FILE_PATH_LIST_DEC = os.path.join(base_dir, 'list_dec.csv')
 
 # スプレッドシートの列
 LIST_COLS = ['No.', 'ID', '出品', '取得日時', '商品名', '商品URL', '出品日']
 
 #--------------------------------------------------------------------------------
-# 出品データ
+# 分析シート - 出品データ
 #--------------------------------------------------------------------------------
 ITEM_SHEET_NAME = '出品データ'
 ITEM_ROW_START = 2              # スプレッドシートの開始行
 
 # 出品データCSVファイル
-FILE_ITEM_CSV = 'item.csv'
-FILE_PATH_ITEM = os.path.join(base_dir, FILE_ITEM_CSV)
+FILE_PATH_ITEM = os.path.join(base_dir, 'item.csv')
+FILE_PATH_DETAIL = os.path.join(base_dir, 'item_detail.csv')
 
 # スプレッドシートの列
 ITEM_COLS = ['No.', 'ID', '出品', '取得日時', '商品名', '商品URL', '出品日',
             'ブランド', 'ブランド1', 'ブランド1 URL', 'ブランド2', 'ブランド2 URL', 'ブランド3', 'ブランド3 URL',
             'カテゴリ1', 'カテゴリ2', 'カテゴリ3', 'ブランド x カテゴリ3', '価格', 'タグ1', 'タグ2',
-            'お問い合わせ', 'アクセス', 'お気に入りアイテム登録', '買付地', '買付先名', '発送地']
+            'お問い合わせ', 'アクセス', 'お気に入りアイテム登録', '買付地', '買付先名', '発送地', '型番']
 
 #--------------------------------------------------------------------------------
-# 注文実績データ
+# 分析シート - 注文実績データ
 #--------------------------------------------------------------------------------
 ORDER_SHEET_NAME = '注文実績'
 ORDER_MAX_PAGES = 30
 
 # 注文実績データCSVファイル
-FILE_ORDER_CSV = 'order.csv'
-FILE_PATH_ORDER = os.path.join(base_dir, FILE_ORDER_CSV)
+FILE_PATH_ORDER = os.path.join(base_dir, 'order.csv')
+FILE_TMP_NAME = 'order'
+FILE_TMP_EXT = 'csv'
 
 # スプレッドシートの列
 ORDER_COLS = ['No.', '取得日時', '商品名', '商品URL', '商品ID', '出品日', '成約日']
 
 # ソートキー(成約日=昇順 and No.=昇順)
 def sort_key(row):
-    sale_date = datetime.datetime.strptime(row[6], '%Y/%m/%d')
+    sale_date = datetime.strptime(row[6], '%Y-%m-%d')
     no = int(row[0])
     return (sale_date, no)
 
 #--------------------------------------------------------------------------------
-# 市場データ
+# 分析シート - 市場データ
 #--------------------------------------------------------------------------------
 MARKET_SHEET_NAME = '市場データ'
 MARKET_MAX_PAGES = 30
 MARKET_MAX_RETRY = 5
 
 # 注文実績データCSVファイル
-MARKET_ORDER_CSV = 'market.csv'
-MARKET_PATH_ORDER = os.path.join(base_dir, MARKET_ORDER_CSV)
+FILE_PATH_MARKET = os.path.join(base_dir, 'market.csv')
 
 # スプレッドシートの列
 MARKET_COLS = ['No.', 'ブランド', 'ブランドURL', '出品数']
 
 #--------------------------------------------------------------------------------
+# 分析シート - 市場データ
+#--------------------------------------------------------------------------------
+MODEL_SHEET_NAME = '型番'
+
+# 注文実績データCSVファイル
+FILE_PATH_MODEL = os.path.join(base_dir, 'model.csv')
+
+# スプレッドシートの列
+MODEL_COLS = ['ID', '型番']
+
+#--------------------------------------------------------------------------------
+# ステータス出力
+#--------------------------------------------------------------------------------
+def update_proc_status(url_manage, url_sheet, index, state):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_STATE, state)
+    # 分析シート
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_STATE, OPE_COL_VALUE, state)
+
+#--------------------------------------------------------------------------------
+# 開始時間出力
+#--------------------------------------------------------------------------------
+def update_proc_start_time(url_manage, url_sheet, index):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_START_DT, get_dt_str())    # 開始時間 出力
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_END_DT, '')                # 終了時間 クリア
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_TIME, '')                  # 処理時間 クリア
+    # 分析シート
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_START_DT, OPE_COL_VALUE, get_dt_str())                      # 開始時間 出力
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_END_DT, OPE_COL_VALUE, '')                                  # 終了時間 クリア
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_TIME, OPE_COL_VALUE, '')                                    # 処理時間 クリア
+
+#--------------------------------------------------------------------------------
+# 終了時間出力
+#--------------------------------------------------------------------------------
+def update_proc_end_time(url_manage, url_sheet, index):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_END_DT, get_dt_str())
+    # 分析シート
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_END_DT, OPE_COL_VALUE, get_dt_str())
+
+#--------------------------------------------------------------------------------
+# 処理時間出力
+#--------------------------------------------------------------------------------
+def update_proc_time(url_manage, url_sheet, index, dt_start, dt_end):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_TIME, get_dt_diff_str(dt_start, dt_end))
+    # 分析シート
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_TIME, OPE_COL_VALUE, get_dt_diff_str(dt_start, dt_end))
+
+#--------------------------------------------------------------------------------
+# 処理時間出力（ステップ別）
+#--------------------------------------------------------------------------------
+def update_step_proc_time(url_manage, index, col, dt_start, dt_end):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, col, get_dt_diff_str(dt_start, dt_end))
+
+
+
+
+#--------------------------------------------------------------------------------
 # 外注管理情報取得
 #--------------------------------------------------------------------------------
-def get_management_info():
+def get_management_info(url):
 
     try:
-        print_ex('外注管理情報取得 開始')
+        print_ex('get_management_info 外注管理情報取得 開始')
 
         # 管理情報シート取得
-        data_all = get_ss_all_values(MANAGE_SS_URL, 'シート1')
+        data_all = get_ss_all_values(url, MANAGE_SS_NAME)
 
         url_list = []
 
@@ -156,12 +260,10 @@ def get_management_info():
 
             url_list.append(data)
 
-        print_ex('外注管理情報取得 終了')
+        print_ex('get_management_info 外注管理情報取得 終了')
 
     except Exception as e:
         print_ex("エラー発生: " + str(e))
-        messege = f'エラーが発生しています。\nログで詳細を確認してください。'
-
         return None
 
     return url_list
@@ -170,24 +272,74 @@ def get_management_info():
 #--------------------------------------------------------------------------------
 # 注文実績取得
 #--------------------------------------------------------------------------------
-def get_order_data(dt, url):
+def get_order_data_multi(dt, url):
 
-    print_ex('注文実績データ取得処理 開始')
+    thread_max = THREAD_MAX_ORDER
+
+    base = ORDER_MAX_PAGES // thread_max
+    remainder = ORDER_MAX_PAGES % thread_max
+    page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
+
+    start_pages = [1]
+    for i in range(1, len(page_nums)):
+        start_pages.append(start_pages[i-1] + page_nums[i-1])
+
+    # テンポラリファイルを削除
+    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+    file_pattern = os.path.join(base_dir, file_pattern)
+    delete_files = glob.glob(file_pattern)
+    for file in delete_files:
+        try:
+            os.remove(file)
+        except OSError as e:
+            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+
+    threads = []
+    for i in range(thread_max):
+        thread = Thread(target=get_order_data, args=(dt, url, i, start_pages[i], page_nums[i]))
+        threads.append(thread)
+        thread.start()    
+
+    # すべてのスレッドが終了するまで待機
+    for thread in threads:
+        thread.join()
+
+    # 収集したファイルを連結
+    df_concat = pd.DataFrame()
+    for i in range(thread_max):
+        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path,
+                dtype={'No.': int, '商品ID': str},
+                parse_dates=['取得日時', '出品日', '成約日'])
+            df_concat = pd.concat([df_concat, df], ignore_index=True)
+
+    df_concat['No.'] = range(1, 1 + len(df_concat))
+    df_concat.to_csv(FILE_PATH_ORDER, index=False)
+    return
+
+
+def get_order_data(dt, url, index, page_start, page_num):
+
+    print_ex(f'注文実績データ取得処理 開始 index={index+1}')
 
     try:
         # ChromeDriver
         driver = get_web_driver()
         
         df_data = pd.DataFrame(columns=ORDER_COLS)
-        #df_data = df_data.astype(str)
         data_list = []
         count = 0
         
-        for i in range(ORDER_MAX_PAGES):
-            target_url = url.replace('<% page %>', str(i + 1))
+        for i in range(page_start, page_start + page_num):
+            target_url = url.replace('<% page %>', str(i))
 
             # URLアクセス
             driver.get(target_url)
+
+            # ページが完全にロードされるまで待機
+            WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
 
             path = '.buyeritemtable_body'
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
@@ -259,15 +411,19 @@ def get_order_data(dt, url):
                 data_list.append(data)
 
             df_data = pd.DataFrame(data_list)
-            df_data.to_csv(FILE_PATH_ORDER, index=False)
+
+            # テンポラリファイルへ出力
+            file_name = f'{FILE_TMP_NAME}_{index+1}.{FILE_TMP_EXT}'
+            file_path = os.path.join(base_dir, file_name)
+            df_data.to_csv(file_path, index=False)
 
     except Exception as e:
         driver.quit()
-        print_ex("エラー発生: " + str(e))
+        print_ex(f'エラー発生(index={index+1}): {str(e)}')
         return False
 
     driver.quit()
-    print_ex('注文実績データ取得処理 終了')
+    print_ex(f'注文実績データ取得処理 終了 index={index+1}')
 
     return True
 
@@ -275,35 +431,93 @@ def get_order_data(dt, url):
 #--------------------------------------------------------------------------------
 # 出品データ取得（リスト）
 #--------------------------------------------------------------------------------
-def get_item_list(url, file, cols):
+def get_item_list_multi(url, cols):
 
-    print_ex('出品データ(リスト)取得処理 開始')
+    thread_max = THREAD_MAX_LIST
+
+    driver = get_web_driver()
+
+    # ページ数取得のためにアクセス
+    driver.get(url)
+
+    # ページが完全にロードされるまで待機
+    WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
+    # ページ数算出
+    path = '#totalitem_num'     # 該当件数
+    if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
+        tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
+        total_num = int(tmp.replace(',',''))
+        total_page = math.ceil(total_num / ITEM_COUNT_PER_PAGE)
+
+    base = total_page // thread_max
+    remainder = total_page % thread_max
+    page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
+
+    start_pages = [1]
+    for i in range(1, len(page_nums)):
+        start_pages.append(start_pages[i-1] + page_nums[i-1])
+
+    # テンポラリファイルを削除
+    FILE_TMP_NAME = 'item_list'
+    FILE_TMP_EXT = 'csv'
+
+    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+    file_pattern = os.path.join(base_dir, file_pattern)
+    delete_files = glob.glob(file_pattern)
+    for file in delete_files:
+        try:
+            os.remove(file)
+        except OSError as e:
+            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+
+    # スレッド開始
+    threads = []
+    for i in range(thread_max):
+        if page_nums[i] > 0:
+            thread = Thread(target=get_item_list, args=(url, cols, i, start_pages[i], page_nums[i]))
+            threads.append(thread)
+            thread.start()    
+
+    # すべてのスレッドが終了するまで待機
+    for thread in threads:
+        thread.join()
+
+    # 収集したファイルを連結
+    df_concat = pd.DataFrame()
+    for i in range(thread_max):
+        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path,
+                dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
+            df_concat = pd.concat([df_concat, df], ignore_index=True)
+
+    df_concat['No.'] = range(1, 1 + len(df_concat))
+    df_concat.to_csv(FILE_PATH_ITEM, index=False)
+    return                
+
+def get_item_list(url, cols, index, page_start, page_num):
+
+    print_ex(f'出品データ(リスト)取得処理 開始 index={index+1}')
 
     try:
         driver = get_web_driver()
 
-        # ページ数取得のためにアクセス
-        driver.get(url)
-
-        # ページ数算出
-        path = '#totalitem_num'     # 該当件数
-        if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
-            tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
-            total_num = int(tmp.replace(',',''))
-            total_page = math.ceil(total_num / ITEM_COUNT_PER_PAGE)
-
         df_data = pd.DataFrame(columns=cols)
-        #df_data = df_data.astype(str)
         data_list = []
         count = 0
         
-        for i in range(total_page):
+        for i in range(page_start, page_start + page_num):
 
             tmp = url[:-3]
-            target_url = tmp + "_" + str(i + 1) + '/'
+            target_url = tmp + "_" + str(i) + '/'
 
             # URLアクセス
             driver.get(target_url)
+
+            # ページが完全にロードされるまで待機
+            WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
 
             path = '.product_lists li'
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
@@ -362,43 +576,100 @@ def get_item_list(url, file, cols):
                 data_list.append(data)
 
             df_data = pd.DataFrame(data_list)
-            df_data.to_csv(file, index=False)
+
+            # テンポラリファイルへ出力
+            FILE_TMP_NAME = 'item_list'
+            FILE_TMP_EXT = 'csv'            
+            file_name = f'{FILE_TMP_NAME}_{index+1}.{FILE_TMP_EXT}'
+            file_path = os.path.join(base_dir, file_name)
+            df_data.to_csv(file_path, index=False)
 
     except Exception as e:
         driver.quit()
-        print_ex("エラー発生: " + str(e))
+        print_ex(f'エラー発生(index={index+1}): {str(e)}')
         return False
 
     driver.quit()
-    print_ex('出品データ(リスト)取得処理 終了')
+    print_ex(f'出品データ(リスト)取得処理 終了 index={index+1}')
 
     return True
-
 
 #--------------------------------------------------------------------------------
 # 出品データ取得（詳細）
 #--------------------------------------------------------------------------------
-def get_item_detail(ss_url):
+def get_item_detail_multi(ss_url):
 
-    print_ex('出品データ(詳細)取得処理 開始')
+    thread_max = THREAD_MAX_DETAIL
+
+    # スプレッドシートから出品データ取得
+    data = get_ss_all_values(ss_url, ITEM_SHEET_NAME)
+    data_cols = data[0]
+    data_rows = data[1:]
+    df_data = pd.DataFrame(data_rows, columns=data_cols)
+
+    split_size = int(np.ceil(len(df_data) / thread_max))
+    split_dfs = {}
+
+    for i in range(0, len(df_data), split_size):
+        start_row = i
+        split_df  = df_data.iloc[i:i + split_size].reset_index(drop=True)
+        split_dfs[start_row] = split_df
+
+    # テンポラリファイルを削除
+    FILE_TMP_NAME = 'item_detail'
+    FILE_TMP_EXT = 'csv'          
+    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+    file_pattern = os.path.join(base_dir, file_pattern)
+    delete_files = glob.glob(file_pattern)
+    for file in delete_files:
+        try:
+            os.remove(file)
+        except OSError as e:
+            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+
+    # スレッド開始
+    threads = []
+    for index, (start_row, split_df) in enumerate(split_dfs.items()):
+        thread = Thread(target=get_item_detail, args=(ss_url, index, start_row, split_df))
+        threads.append(thread)
+        thread.start()    
+
+    # すべてのスレッドが終了するまで待機
+    for thread in threads:
+        thread.join()
+
+    # 収集したファイルを連結
+    df_concat = pd.DataFrame()
+    for i in range(thread_max):
+        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path,
+                dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
+            df_concat = pd.concat([df_concat, df], ignore_index=True)
+
+    df_concat['No.'] = range(1, 1 + len(df_concat))
+    df_concat.to_csv(FILE_PATH_DETAIL, index=False)
+
+    # 型番のみファイル出力
+    df_model = df_concat[['ID', '商品名', 'ブランド', '型番']]
+    df_model['型番'] = df_model['型番'].str.split('<br>')
+    df_exploded = df_model.explode('型番')
+    df_exploded = df_exploded[df_exploded['型番'].notna()]
+    df_unique = df_exploded.drop_duplicates(subset=['ID', '型番'])
+    df_unique.to_csv(FILE_PATH_MODEL, index=False)
+
+    return
+
+
+def get_item_detail(ss_url, index, start_row, df_data):
+
+    print_ex(f'出品データ(詳細)取得処理 開始 index={index+1}')
 
     try:
         driver = get_web_driver()
-        
-        #df_data = pd.read_csv(FILE_PATH_ITEM)  #★CSVではなくスプレッドシートから読込み
-        #df_data = df_data.astype(str) #これをするとisnull比較ができなくなる'nan'となるため
-
-        # スプレッドシートから出品データ取得
-        data = get_ss_all_values(ss_url, '出品データ')
-        data_cols = data[0]
-        data_rows = data[1:]
-        df_data = pd.DataFrame(data_rows, columns=data_cols)
 
         for i in range(df_data.shape[0]):
-
-            # 既に取得済みならスキップ      # ★ここきかなくなったSSから読むと
-            # if pd.isnull(df_data['ブランド'][i]) == False:
-            #     continue
 
             if df_data['出品'][i] == '削除' or df_data['出品'][i] == '出品中':
                 continue
@@ -555,6 +826,17 @@ def get_item_detail(ss_url):
                     tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
                     df_data.loc[i, '発送地'] = str(tmp)
 
+                # 型番
+                path = '#s_season dd a'
+                if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
+                    elems = driver.find_elements(By.CSS_SELECTOR, path)
+                    tmp = ''
+                    for elem in elems:
+                        if tmp != '':
+                            tmp += '<br>'
+                        tmp += elem.text.strip()
+                    df_data.loc[i, '型番'] = str(tmp)
+
             if no_item:
                 # 出品が削除されてカテゴリだけ取得
                 df_data.loc[i, '出品'] = '削除'
@@ -565,7 +847,12 @@ def get_item_detail(ss_url):
             # 取得日時
             df_data.loc[i, '取得日時'] = get_dt_str()
 
-            df_data.to_csv(FILE_PATH_ITEM, index=False)
+        # テンポラリファイルへ出力
+        FILE_TMP_NAME = 'item_detail'
+        FILE_TMP_EXT = 'csv'            
+        file_name = f'{FILE_TMP_NAME}_{index+1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        df_data.to_csv(file_path, index=False)
 
     except Exception as e:
         driver.quit()
@@ -573,78 +860,72 @@ def get_item_detail(ss_url):
         return False
     
     driver.quit()
-    print_ex('出品データ(詳細)取得処理 終了')
+    print_ex(f'出品データ(詳細)取得処理 終了 index={index+1}')
 
     return True
 
+#--------------------------------------------------------------------------------
+# 市場データ取得
+#--------------------------------------------------------------------------------
+def get_market_data_multi():
 
-def item_to_market(ss_url):
+    THREAD_MAX = THREAD_MAX_MARKET
 
     # スプレッドシートから出品データ取得
-    data = get_ss_all_values(ss_url, '出品データ')
-    data_cols = data[0]
-    data_rows = data[1:]
-    df_data = pd.DataFrame(data_rows, columns=data_cols)
+    df_data = pd.read_csv(FILE_PATH_MARKET)
 
-    # ブランド3で重複除去
-    df_data = df_data.drop_duplicates(subset='ブランド3')           # 重複除去
-    df_data = df_data[df_data['ブランド3'] != '']                   # 欠損行を削除
-    df_data = df_data[['No.', 'ブランド', 'カテゴリ3', 'ブランド x カテゴリ3', 'ブランド3', 'ブランド3 URL']]        # 列抽出
-    df_data = df_data.reset_index(drop=True)
-    df_data['No.'] = df_data.index + 1                              # 連番振り直し
-    df_data['出品数'] = -1                                          # 列追加
-    df_data.to_csv(MARKET_PATH_ORDER, index=False)                  # ファイル出力
+    split_size = int(np.ceil(len(df_data) / THREAD_MAX))
+    split_dfs = {}
 
+    for i in range(0, len(df_data), split_size):
+        start_row = i
+        split_df  = df_data.iloc[i:i + split_size].reset_index(drop=True)
+        split_dfs[start_row] = split_df
 
-def merge_item_data():
+    # テンポラリファイルを削除
+    FILE_TMP_NAME = 'market'
+    FILE_TMP_EXT = 'csv'          
+    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+    file_pattern = os.path.join(base_dir, file_pattern)
+    delete_files = glob.glob(file_pattern)
+    for file in delete_files:
+        try:
+            os.remove(file)
+        except OSError as e:
+            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
 
-    # 外注総合管理情報
-    url_list = get_management_info()
+    # スレッド開始
+    threads = []
+    for index, (start_row, split_df) in enumerate(split_dfs.items()):
+        thread = Thread(target=get_market_data, args=(index, split_df))
+        threads.append(thread)
+        thread.start()    
 
-    # 処理対象スプレッドシート
-    ss_url = url_list[0]['sheet_url']       # ★index=0固定？？
+    # すべてのスレッドが終了するまで待機
+    for thread in threads:
+        thread.join()
 
-    # 出品データ取得
-    data = get_ss_all_values(ss_url, '出品データ')
-    data_cols = data[0]
-    data_rows = data[1:]
-    df_item = pd.DataFrame(data_rows, columns=data_cols)
+    # 収集したファイルを連結
+    df_concat = pd.DataFrame()
+    for i in range(THREAD_MAX):
+        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path, dtype={'No.': int, '出品数': int})
+            df_concat = pd.concat([df_concat, df], ignore_index=True)
 
-    # 差分比較用リスト
-    df_list = pd.read_csv(FILE_PATH_LIST)
+    df_concat['No.'] = range(1, 1 + len(df_concat))
+    df_concat.to_csv(FILE_PATH_MARKET, index=False)
 
-    # IDをキーにマージ
-    df_list['ID'] = df_list['ID'].astype(str)
-    df_item['ID'] = df_item['ID'].astype(str)
-    merged_df = pd.merge(df_list, df_item, on='ID', how='outer', indicator=True)
-    merged_df.to_csv('test_merged_df.csv', index=False)   
-
-    # 新たに増えた商品データを商品リストに追加
-    df_list_only = merged_df[merged_df['_merge'] == 'left_only']
-    df_list_only_ids = df_list_only['ID'].tolist()
-    df_add_rows = df_list[df_list['ID'].isin(df_list_only_ids)]
-    df_item = pd.concat([df_item, df_add_rows], ignore_index=True)
-    df_item.to_csv('test_df_add_rows.csv', index=False)
-
-    df_item.loc[df_item['ID'].isin(df_list_only_ids), '出品'] = '未取得'
-    df_item.to_csv('test_01.csv', index=False)
-
-    # 減った商品データに削除フラグを付ける
-    df_item_only = merged_df[merged_df['_merge'] == 'right_only']
-    df_item_only_ids = df_item_only['ID'].tolist()
-    df_item.loc[df_item['ID'].isin(df_item_only_ids), '出品'] = '削除'
-    df_item.to_csv('test_02.csv', index=False)
-
-    print('テスト終了')
+    return
 
 
-def get_market_data():
+def get_market_data(index, df_data):
 
-    print_ex('市場データ取得処理 開始')
+    print_ex(f'市場データ取得処理 開始 index={index+1}')
 
     try:
         driver = get_web_driver()
-        df_data = pd.read_csv(MARKET_PATH_ORDER)
 
         for i in range(df_data.shape[0]):
 
@@ -660,7 +941,14 @@ def get_market_data():
                 tmp = tmp.replace(',', '')
                 df_data.loc[i, '出品数'] = tmp
             
-            df_data.to_csv(MARKET_PATH_ORDER, index=False)
+            df_data.to_csv(FILE_PATH_MARKET, index=False)
+
+        # テンポラリファイルへ出力
+        FILE_TMP_NAME = 'market'
+        FILE_TMP_EXT = 'csv'          
+        file_name = f'{FILE_TMP_NAME}_{index+1}.{FILE_TMP_EXT}'
+        file_path = os.path.join(base_dir, file_name)
+        df_data.to_csv(file_path, index=False)
 
     except Exception as e:
         driver.quit()
@@ -668,18 +956,40 @@ def get_market_data():
         return False
     
     driver.quit()
-    print_ex('市場データ取得処理 終了')
+    print_ex(f'市場データ取得処理 終了 index={index+1}')
     return True
 
+#--------------------------------------------------------------------------------
+# 出品データ→市場データ用リスト
+#--------------------------------------------------------------------------------
+def item_to_market(ss_url):
+
+    # スプレッドシートから出品データ取得
+    data = get_ss_all_values(ss_url, ITEM_SHEET_NAME)
+    data_cols = data[0]
+    data_rows = data[1:]
+    df_data = pd.DataFrame(data_rows, columns=data_cols)
+
+    # ブランド3で重複除去
+    df_data = df_data.drop_duplicates(subset='ブランド3')           # 重複除去
+    df_data = df_data[df_data['ブランド3'] != '']                   # 欠損行を削除
+    df_data = df_data[['No.', 'ブランド', 'カテゴリ3', 'ブランド x カテゴリ3', 'ブランド3', 'ブランド3 URL']]        # 列抽出
+    df_data = df_data.reset_index(drop=True)
+    df_data['No.'] = df_data.index + 1                              # 連番振り直し
+    df_data['出品数'] = -1                                          # 列追加
+    df_data.to_csv(FILE_PATH_MARKET, index=False)                   # ファイル出力
+
+#--------------------------------------------------------------------------------
 # 注文実績にあるが未出品の商品IDリスト取得
+#--------------------------------------------------------------------------------
 def get_compare_order_of_item(ss_url):
 
     # 出品データ取得
-    data_item = get_ss_all_values(ss_url, '出品データ')
+    data_item = get_ss_all_values(ss_url, ITEM_SHEET_NAME)
     ids_item = [row[1] for row in data_item[1:]]
 
     # 注文実績取得
-    data_order = get_ss_all_values(ss_url, '注文実績')
+    data_order = get_ss_all_values(ss_url, ORDER_SHEET_NAME)
     ids_order = [row[4] for row in data_order[1:]]
 
     # 追加するIDリスト
@@ -699,7 +1009,7 @@ def get_compare_order_of_item(ss_url):
 
 def main():
     print('テスト実行')
-    get_compare_order_of_item('https://docs.google.com/spreadsheets/d/1kToIpIvwmrSzcKrPn0Y93-oD8LvQC7SWnFo-NpVmMyk/')
+
 
 if __name__ == "__main__":
     main()
