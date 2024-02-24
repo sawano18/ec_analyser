@@ -54,10 +54,6 @@ class GetDataStep(Enum):
 #--------------------------------------------------------------------------------
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
-#MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1MLI2MJuwj42959gcM9JYm7a44hQ1Zy2LNkbgQrQV0h0/'
-#MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1oLh0o2Dh-ujktKTjRB3zQT5MmII9vulAvm-Mus0iKeQ/'
-#MANAGE_SS_URL = 'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/'
-    
 MANAGE_SS_URL = [
     'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/',
     'https://docs.google.com/spreadsheets/d/1JZKyB-bRqIE1kcLbCHjTLg2XB-6OTaGgIMrEUQtW2Uc/'
@@ -189,9 +185,9 @@ def update_proc_start_time(url_manage, url_sheet, index):
     set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_END_DT, '')                # 終了時間 クリア
     set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_TIME, '')                  # 処理時間 クリア
     # 分析シート
-    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_START_DT, OPE_COL_VALUE, get_dt_str())                      # 開始時間 出力
-    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_END_DT, OPE_COL_VALUE, '')                                  # 終了時間 クリア
-    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_TIME, OPE_COL_VALUE, '')                                    # 処理時間 クリア
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_START_DT, OPE_COL_VALUE, get_dt_str())                   # 開始時間 出力
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_END_DT, OPE_COL_VALUE, '')                               # 終了時間 クリア
+    set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_TIME, OPE_COL_VALUE, '')                                 # 処理時間 クリア
 
 #--------------------------------------------------------------------------------
 # 終了時間出力
@@ -217,8 +213,6 @@ def update_proc_time(url_manage, url_sheet, index, dt_start, dt_end):
 def update_step_proc_time(url_manage, index, col, dt_start, dt_end):
     # 外注総合管理シート
     set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, col, get_dt_diff_str(dt_start, dt_end))
-
-
 
 
 #--------------------------------------------------------------------------------
