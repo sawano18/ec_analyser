@@ -672,6 +672,9 @@ def get_item_detail(ss_url, index, start_row, df_data):
             target_url = df_data.loc[i, '商品URL']
             driver.get(target_url)
 
+            # ページが完全にロードされるまで待機
+            WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
             no_item = False
             path = '.notfoundSection_txt'
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
@@ -927,6 +930,9 @@ def get_market_data(index, df_data):
             target_url = df_data.loc[i, 'ブランド3 URL']
 
             driver.get(target_url)
+
+            # ページが完全にロードされるまで待機
+            WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
 
             # 該当件数
             path = '#totalitem_num'
