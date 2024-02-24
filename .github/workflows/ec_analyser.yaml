@@ -32,4 +32,4 @@ jobs:
       - name: Run Python
 
         run:
-          python get_data_init.py
+          python get_data_main.py
