@@ -216,7 +216,7 @@ def get_data_init(url, index, info):
             update_proc_end_time(url_manage, url_sheet, index)
             update_proc_time(url_manage, url_sheet, index, dt_start_total, datetime.now(tz))
             update_step_proc_time(url_manage, index, MANAGE_COL_INIT_TOTAL, dt_start_total, datetime.now(tz))
-            
+
             print_ex('[6] get_data_init 終了処理 終了 ' + ss_name)          
 
     except Exception as e:

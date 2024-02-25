@@ -351,6 +351,9 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
             path = '.buyeritemtable_body'
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
                 elems = driver.find_elements(By.CSS_SELECTOR, path)
+            else:
+                # 30ページ固定でアクセスしているので実績件数によりページアクセスに失敗する
+                continue
 
             for elem in elems:
 
