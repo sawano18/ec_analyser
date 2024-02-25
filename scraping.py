@@ -305,7 +305,7 @@ def get_order_data_multi(dt, url):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'[Th.{error[0]}]エラー発生')
+                print_ex(f'[Th.{error[0]+1}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -352,7 +352,7 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 # 注文実績取得タスク
 def get_order_data_worker(dt, url, index, page_start, page_num):
 
-    print_ex(f'注文実績データ取得処理 開始 index={index+1}')
+    print_ex(f'[Th.{index+1}] 注文実績データ取得処理 開始')
 
     try:
         # ChromeDriver
@@ -453,7 +453,7 @@ def get_order_data_worker(dt, url, index, page_start, page_num):
         return False
 
     driver.quit()
-    print_ex(f'注文実績データ取得処理 終了 index={index+1}')
+    print_ex(f'[Th.{index+1}] 注文実績データ取得処理 終了')
     return True
 
 #--------------------------------------------------------------------------------
@@ -517,7 +517,7 @@ def get_item_list_multi(url, cols):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'[Th.{error[0]}]エラー発生')
+                print_ex(f'[Th.{error[0]+1}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -545,10 +545,10 @@ def get_item_list(dt, url, index, page_start, page_num, errors, lock):
         result = get_item_list_worker(dt, url, index, page_start, page_num)
 
         if result:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
             return
         else:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目失敗')
 
     print_ex(f'[Th.{index+1}] リトライオーバー')
 
@@ -562,7 +562,7 @@ def get_item_list(dt, url, index, page_start, page_num, errors, lock):
 # 出品データ取得（リスト）タスク
 def get_item_list_worker(url, cols, index, page_start, page_num):
 
-    print_ex(f'出品データ(リスト)取得処理 開始 index={index+1}')
+    print_ex(f'[Th.{index+1}] 出品データ(リスト)取得処理 開始')
 
     try:
         driver = get_web_driver()
@@ -649,11 +649,11 @@ def get_item_list_worker(url, cols, index, page_start, page_num):
 
     except Exception as e:
         driver.quit()
-        print_ex(f'エラー発生(index={index+1}): {str(e)}')
+        print_ex(f'[Th.{index+1}] エラー発生: {str(e)}')
         return False
 
     driver.quit()
-    print_ex(f'出品データ(リスト)取得処理 終了 index={index+1}')
+    print_ex(f'[Th.{index+1}] 出品データ(リスト)取得処理 終了')
     return True
 
 #--------------------------------------------------------------------------------
@@ -706,7 +706,7 @@ def get_item_detail_multi(ss_url):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'[Th.{error[0]}]エラー発生')
+                print_ex(f'[Th.{error[0]+1}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -743,10 +743,10 @@ def get_item_detail(ss_url, index, start_row, split_df, errors, lock):
         result = get_item_detail_worker(ss_url, index, start_row, split_df)
 
         if result:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
             return
         else:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目失敗')
 
     print_ex(f'[Th.{index+1}] リトライオーバー')
 
@@ -758,7 +758,7 @@ def get_item_detail(ss_url, index, start_row, split_df, errors, lock):
 # 出品データ取得（詳細）タスク
 def get_item_detail_worker(ss_url, index, start_row, df_data):
 
-    print_ex(f'出品データ(詳細)取得処理 開始 index={index+1}')
+    print_ex(f'[Th.{index+1}] 出品データ(詳細)取得処理 開始')
 
     try:
         driver = get_web_driver()
@@ -953,11 +953,11 @@ def get_item_detail_worker(ss_url, index, start_row, df_data):
 
     except Exception as e:
         driver.quit()
-        print_ex(f'エラー発生(index={index+1}): {str(e)}')
+        print_ex(f'[Th.{index+1}] エラー発生: {str(e)}')
         return False
 
     driver.quit()
-    print_ex(f'出品データ(詳細)取得処理 終了 index={index+1}')
+    print_ex(f'[Th.{index+1}] 出品データ(詳細)取得処理 終了')
     return True
 
 #--------------------------------------------------------------------------------
@@ -1006,7 +1006,7 @@ def get_market_data_multi():
     # エラー確認
     if errors:
         for error in errors:
-            print_ex(f'[Th.{error[0]}]エラー発生')
+            print_ex(f'[Th.{error[0]+1}]エラー発生')
         raise
 
     # 収集したファイルを連結
@@ -1029,10 +1029,10 @@ def get_market_data(index, split_df, errors, lock):
         result = get_market_data_worker(index, split_df)
 
         if result:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
             return
         else:
-            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+            print_ex(f'[Th.{index+1}] 試行 {i+1}回目失敗')
 
     print_ex(f'[Th.{index+1}] リトライオーバー')
 
@@ -1044,7 +1044,7 @@ def get_market_data(index, split_df, errors, lock):
 # 市場データ取得タスク
 def get_market_data_worker(index, df_data):
 
-    print_ex(f'市場データ取得処理 開始 index={index+1}')
+    print_ex(f'[Th.{index+1}] 市場データ取得処理 開始')
 
     try:
         driver = get_web_driver()
@@ -1077,11 +1077,11 @@ def get_market_data_worker(index, df_data):
 
     except Exception as e:
         driver.quit()
-        print_ex("エラー発生: " + str(e))
+        print_ex(f'[Th.{index+1}] エラー発生: {str(e)}')
         return False
 
     driver.quit()
-    print_ex(f'市場データ取得処理 終了 index={index+1}')
+    print_ex(f'[Th.{index+1}] 市場データ取得処理 終了')
     return True
 
 #--------------------------------------------------------------------------------

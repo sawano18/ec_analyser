@@ -46,7 +46,7 @@ def get_data_init(url, index, info):
         if (state == GetDataStep.INIT_NONE.value or         # 初回データ取得予約
             state == GetDataStep.INIT_ERROR.value):         # 初回取得エラー
 
-            print_ex('[0] get_data_init 初期化 開始' + ss_name)
+            print_ex('[St.0] get_data_init 初期化 開始' + ss_name)
 
             # 開始時間を記録
             update_proc_start_time(url_manage, url_sheet, index)
@@ -54,24 +54,21 @@ def get_data_init(url, index, info):
             # ステップ移行
             state = GetDataStep.INIT_RUN_ORDER.value
 
-            print_ex('[0] get_data_init 初期化 終了' + ss_name)
+            print_ex('[St.0] get_data_init 初期化 終了' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.1 - 注文実績を取得する(最大900件)
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_RUN_ORDER.value:       # 初回取得中(注文実績)
 
-            print_ex('[1] get_data_init 注文実績取得 開始 ' + ss_name)
+            print_ex('[St.1] get_data_init 注文実績取得 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
             dt_start = datetime.now(tz)
 
             # 注文実績→CSVファイル
-            if get_order_data_multi(get_dt_str(), url_order) == False:
-                state = GetDataStep.INIT_ERROR.value
-                update_proc_status(url_manage, url_sheet, index, state)
-                return
+            get_order_data_multi(get_dt_str(), url_order)
 
             # CSVファイルから読込み
             data = csv_to_array(FILE_PATH_ORDER)
@@ -100,14 +97,14 @@ def get_data_init(url, index, info):
             # ステップ移行
             state = GetDataStep.INIT_RUN_LIST.value
 
-            print_ex('[1] get_data_init 注文実績取得 終了 ' + ss_name)
+            print_ex('[St.1] get_data_init 注文実績取得 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.2 - 出品データのリストを取得
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_RUN_LIST.value:        # 初回取得中(出品リスト)
 
-            print_ex('[2] get_data_init 出品データ(リスト)取得 開始 ' + ss_name)
+            print_ex('[St.2] get_data_init 出品データ(リスト)取得 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -125,14 +122,14 @@ def get_data_init(url, index, info):
 
             # ステップ移行
             state = GetDataStep.INIT_RUN_CHECK.value
-            print_ex('[2] get_data_init 出品データ(リスト)取得 終了 ' + ss_name)
+            print_ex('[St.2] get_data_init 出品データ(リスト)取得 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.3 - 出品停止リスト追加
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_RUN_CHECK.value:       # 初回取得中(出品リスト確認)
 
-            print_ex('[3] get_data_init 出品データ確認 開始 ' + ss_name)
+            print_ex('[St.3] get_data_init 出品データ確認 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -146,14 +143,14 @@ def get_data_init(url, index, info):
 
             # ステップ移行
             state = GetDataStep.INIT_RUN_ITEM.value
-            print_ex('[3] get_data_init 出品データ確認 終了 ' + ss_name)
+            print_ex('[St.3] get_data_init 出品データ確認 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.4 - 出品データの詳細データを取得
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_RUN_ITEM.value:        # 初回取得中(出品データ)
 
-            print_ex('[4] get_data_init 出品データ(詳細) 開始 ' + ss_name)
+            print_ex('[St.4] get_data_init 出品データ(詳細) 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -175,14 +172,14 @@ def get_data_init(url, index, info):
 
             # ステップ移行
             state = GetDataStep.INIT_RUN_MARKET.value
-            print_ex('[4] get_data_init 出品データ(詳細) 終了 ' + ss_name)
+            print_ex('[St.4] get_data_init 出品データ(詳細) 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.5 - カテゴリ抽出し市場データを取得する
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_RUN_MARKET.value:      # 初回取得中(市場データ)
 
-            print_ex('[5] get_data_init 市場データ取得 開始 ' + ss_name)
+            print_ex('[St.5] get_data_init 市場データ取得 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -203,21 +200,21 @@ def get_data_init(url, index, info):
 
             # ステップ移行
             state = GetDataStep.INIT_DONE.value
-            print_ex('[5] get_data_init 市場データ取得 終了 ' + ss_name)
+            print_ex('[St.5] get_data_init 市場データ取得 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.6 - 正常終了
         #--------------------------------------------------------------------------------
         if state == GetDataStep.INIT_DONE.value:      # 初回取得済
 
-            print_ex('[6] get_data_init 終了処理 開始 ' + ss_name)
+            print_ex('[St.6] get_data_init 終了処理 開始 ' + ss_name)
 
             update_proc_status(url_manage, url_sheet, index, state)
             update_proc_end_time(url_manage, url_sheet, index)
             update_proc_time(url_manage, url_sheet, index, dt_start_total, datetime.now(tz))
             update_step_proc_time(url_manage, index, MANAGE_COL_INIT_TOTAL, dt_start_total, datetime.now(tz))
 
-            print_ex('[6] get_data_init 終了処理 終了 ' + ss_name)          
+            print_ex('[St.6] get_data_init 終了処理 終了 ' + ss_name)          
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')

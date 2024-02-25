@@ -49,7 +49,7 @@ def get_data_update(url, index, info):
             state == GetDataStep.UPDATE_DONE.value or       # 更新済
             state == GetDataStep.UPDATE_ERROR.value):       # 更新エラー
 
-            print_ex('[0] get_data_update 初期化 開始' + ss_name)
+            print_ex('[St.0] get_data_update 初期化 開始' + ss_name)
 
             # 開始時間を記録
             update_proc_start_time(url_manage, url_sheet, index)
@@ -57,24 +57,21 @@ def get_data_update(url, index, info):
             # ステップ移行
             state = GetDataStep.UPDATE_RUN_ORDER.value
 
-            print_ex('[0] get_data_update 初期化 終了' + ss_name)
+            print_ex('[St.0] get_data_update 初期化 終了' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.1 - 注文実績を追加
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_RUN_ORDER.value:       # 更新中(注文実績)
 
-            print_ex('[1] get_data_update 注文実績更新 開始 ' + ss_name)
+            print_ex('[St.1] get_data_update 注文実績更新 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
             dt_start = datetime.now(tz)
 
             # 注文実績→CSVファイル
-            if get_order_data_multi(get_dt_str(), url_order) == False:
-                state = GetDataStep.INIT_ERROR.value
-                update_proc_status(url_manage, url_sheet, index, state)
-                return
+            get_order_data_multi(get_dt_str(), url_order)
 
             # 前回取得データの最新日時を取得
             data_latest = get_ss_all_values(url_sheet, ORDER_SHEET_NAME)
@@ -109,14 +106,14 @@ def get_data_update(url, index, info):
             # ステップ移行
             state = GetDataStep.UPDATE_RUN_LIST.value
 
-            print_ex('[1] get_data_update 注文実績更新 終了 ' + ss_name)
+            print_ex('[St.1] get_data_update 注文実績更新 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.2 - 出品データ更新
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_RUN_LIST.value:        # 更新中(出品リスト)
 
-            print_ex('[2] get_data_update 出品データ更新 開始 ' + ss_name)
+            print_ex('[St.2] get_data_update 出品データ更新 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -163,14 +160,14 @@ def get_data_update(url, index, info):
             # ステップ移行
             state = GetDataStep.UPDATE_RUN_ITEM.value
 
-            print_ex('[2] get_data_update 出品データ更新 終了 ' + ss_name)
+            print_ex('[St.2] get_data_update 出品データ更新 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.3 - 増加した出品データ詳細を取得
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_RUN_ITEM.value:        # 更新中(出品データ)
 
-            print_ex('[3] get_data_update 出品データ取得(増分) 開始 ' + ss_name)
+            print_ex('[St.3] get_data_update 出品データ取得(増分) 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -193,14 +190,14 @@ def get_data_update(url, index, info):
             # ステップ移行
             state = GetDataStep.UPDATE_RUN_MARKET.value
 
-            print_ex('[3] get_data_update 出品データ取得(増分) 終了 ' + ss_name)
+            print_ex('[St.3] get_data_update 出品データ取得(増分) 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.4 - カテゴリ抽出し市場データを取得
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_RUN_MARKET.value:        # 更新中(市場データ)
 
-            print_ex('[4] get_data_update 市場データ更新 開始 ' + ss_name)
+            print_ex('[St.4] get_data_update 市場データ更新 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
             # 開始時間記録
@@ -222,21 +219,21 @@ def get_data_update(url, index, info):
             # ステップ移行
             state = GetDataStep.UPDATE_DONE.value
 
-            print_ex('[4] get_data_update 市場データ更新 終了 ' + ss_name)
+            print_ex('[St.4] get_data_update 市場データ更新 終了 ' + ss_name)
 
         #--------------------------------------------------------------------------------
         # step.5 - 正常終了
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_DONE.value:      # 初回取得済
 
-            print_ex('[5] get_data_update 終了処理 開始 ' + ss_name)
+            print_ex('[St.5] get_data_update 終了処理 開始 ' + ss_name)
 
             update_proc_status(url_manage, url_sheet, index, state)
             update_proc_end_time(url_manage, url_sheet, index)
             update_proc_time(url_manage, url_sheet, index, dt_start_total, datetime.now(tz))
             update_step_proc_time(url_manage, index, MANAGE_COL_UPDATE_TOTAL, dt_start_total, datetime.now(tz))
 
-            print_ex('[5] get_data_update 終了処理 終了 ' + ss_name)
+            print_ex('[St.5] get_data_update 終了処理 終了 ' + ss_name)
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
