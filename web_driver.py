@@ -13,8 +13,8 @@ def get_web_driver():
     options = Options()
     options.add_argument('--headless');             # ヘッドレスモードで起動
     options.add_argument("--log-level=3")
-    options.add_argument("--disable-gpu")
-    options.page_load_strategy = 'eager'            # ロード戦略をeagerに設定
+    #options.add_argument("--disable-gpu")
+    #options.page_load_strategy = 'eager'            # ロード戦略をeagerに設定
 
     # ChromeDriver
     driver = webdriver.Chrome(service=service, options=options)
