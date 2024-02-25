@@ -83,7 +83,7 @@ def get_data_update(url, index, info):
                 data_latest = sorted(data_latest[1:], key=sort_key)
                 dt_latest = data_latest[-1][6]
                 dt_latest = datetime.strptime(dt_latest, '%Y-%m-%d').date()
-            
+
             # CSVファイルから読込み
             data = csv_to_array(FILE_PATH_ORDER)
             data_sorted = sorted(data, key=sort_key)
@@ -115,7 +115,7 @@ def get_data_update(url, index, info):
         # step.2 - 出品データ更新
         #--------------------------------------------------------------------------------
         if state == GetDataStep.UPDATE_RUN_LIST.value:        # 更新中(出品リスト)
-        
+
             print_ex('[2] get_data_update 出品データ更新 開始 ' + ss_name)
             update_proc_status(url_manage, url_sheet, index, state)
 
@@ -235,14 +235,13 @@ def get_data_update(url, index, info):
             update_proc_end_time(url_manage, url_sheet, index)
             update_proc_time(url_manage, url_sheet, index, dt_start_total, datetime.now(tz))
             update_step_proc_time(url_manage, index, MANAGE_COL_UPDATE_TOTAL, dt_start_total, datetime.now(tz))
-            
+
             print_ex('[5] get_data_update 終了処理 終了 ' + ss_name)
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
         state = GetDataStep.UPDATE_ERROR.value
         update_proc_status(url_manage, url_sheet, index, state)
-        raise
 
     print_ex('データ更新 処理終了')
     return

@@ -9,7 +9,7 @@ from tool import *
 from google_api import *
 from web_driver import *
 from enum import Enum
-from threading import Thread
+from threading import Thread, Lock
 import glob
 import time
 from selenium.webdriver.support.ui import WebDriverWait
@@ -25,9 +25,10 @@ else:
         os.makedirs(base_dir)
 
 #--------------------------------------------------------------------------------
-# 平行化
+# 並列化
 #--------------------------------------------------------------------------------
-THREAD_MAX_ORDER = 10
+#THREAD_MAX_ORDER = 10
+THREAD_MAX_ORDER = 1
 THREAD_MAX_LIST = 10
 THREAD_MAX_DETAIL = 16
 THREAD_MAX_MARKET = 16
@@ -78,8 +79,8 @@ MANAGE_COLS = [
         'create_date',  # 作成日
         'shop_url',     # ライバルURL
         'order_url',    # 注文実績URL
-        'item_url'      # 商品URL
-        'state'         # 状態
+        'item_url',     # 商品URL
+        'state',        # 状態
         'update'        # 更新日時
     ]
 
@@ -268,64 +269,77 @@ def get_management_info(url):
 #--------------------------------------------------------------------------------
 def get_order_data_multi(dt, url):
 
-    thread_max = THREAD_MAX_ORDER
+    try:
+        thread_max = THREAD_MAX_ORDER
 
-    base = ORDER_MAX_PAGES // thread_max
-    remainder = ORDER_MAX_PAGES % thread_max
-    page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
+        base = ORDER_MAX_PAGES // thread_max
+        remainder = ORDER_MAX_PAGES % thread_max
+        page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
 
-    start_pages = [1]
-    for i in range(1, len(page_nums)):
-        start_pages.append(start_pages[i-1] + page_nums[i-1])
+        start_pages = [1]
+        for i in range(1, len(page_nums)):
+            start_pages.append(start_pages[i-1] + page_nums[i-1])
 
-    # テンポラリファイルを削除
-    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
-    file_pattern = os.path.join(base_dir, file_pattern)
-    delete_files = glob.glob(file_pattern)
-    for file in delete_files:
-        try:
-            os.remove(file)
-        except OSError as e:
-            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+        # テンポラリファイルを削除
+        file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+        file_pattern = os.path.join(base_dir, file_pattern)
+        delete_files = glob.glob(file_pattern)
+        for file in delete_files:
+            try:
+                os.remove(file)
+            except OSError as e:
+                print_ex(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
 
-    threads = []
-    for i in range(thread_max):
-        thread = Thread(target=get_order_data, args=(dt, url, i, start_pages[i], page_nums[i]))
-        threads.append(thread)
-        thread.start()    
+        threads = []
+        errors = []
+        lock = Lock()
+        for i in range(thread_max):
+            thread = Thread(target=get_order_data, args=(dt, url, i, start_pages[i], page_nums[i], errors, lock))
+            threads.append(thread)
+            thread.start()    
 
-    # すべてのスレッドが終了するまで待機
-    for thread in threads:
-        thread.join()
+        # すべてのスレッドが終了するまで待機
+        for thread in threads:
+            thread.join()
 
-    # 収集したファイルを連結
-    df_concat = pd.DataFrame()
-    for i in range(thread_max):
-        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
-        file_path = os.path.join(base_dir, file_name)
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path,
-                dtype={'No.': int, '商品ID': str},
-                parse_dates=['取得日時', '出品日', '成約日'])
-            df_concat = pd.concat([df_concat, df], ignore_index=True)
+        # エラー確認
+        if errors:
+            for error in errors:
+                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+            raise
 
-    df_concat['No.'] = range(1, 1 + len(df_concat))
-    df_concat.to_csv(FILE_PATH_ORDER, index=False)
+        # 収集したファイルを連結
+        df_concat = pd.DataFrame()
+        for i in range(thread_max):
+            file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+            file_path = os.path.join(base_dir, file_name)
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path,
+                    dtype={'No.': int, '商品ID': str},
+                    parse_dates=['取得日時', '出品日', '成約日'])
+                df_concat = pd.concat([df_concat, df], ignore_index=True)
+
+        df_concat['No.'] = range(1, 1 + len(df_concat))
+        df_concat.to_csv(FILE_PATH_ORDER, index=False)
+
+    except Exception as e:
+        print_ex(f'エラー発生: {e}')
+
     return
 
-
-def get_order_data(dt, url, index, page_start, page_num):
+# 注文実績取得タスク
+def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
     print_ex(f'注文実績データ取得処理 開始 index={index+1}')
 
     try:
         # ChromeDriver
         driver = get_web_driver()
-        
+
         df_data = pd.DataFrame(columns=ORDER_COLS)
         data_list = []
         count = 0
-        
+
         for i in range(page_start, page_start + page_num):
             target_url = url.replace('<% page %>', str(i))
 
@@ -338,9 +352,7 @@ def get_order_data(dt, url, index, page_start, page_num):
             path = '.buyeritemtable_body'
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
                 elems = driver.find_elements(By.CSS_SELECTOR, path)
-            else:
-                continue
-            
+
             for elem in elems:
 
                 data = {}
@@ -414,12 +426,13 @@ def get_order_data(dt, url, index, page_start, page_num):
     except Exception as e:
         driver.quit()
         print_ex(f'エラー発生(index={index+1}): {str(e)}')
-        return False
+        with lock:
+            errors.append((index, str(e)))
+        return
 
     driver.quit()
     print_ex(f'注文実績データ取得処理 終了 index={index+1}')
-
-    return True
+    return
 
 
 #--------------------------------------------------------------------------------
@@ -427,71 +440,85 @@ def get_order_data(dt, url, index, page_start, page_num):
 #--------------------------------------------------------------------------------
 def get_item_list_multi(url, cols):
 
-    thread_max = THREAD_MAX_LIST
+    try:
+        thread_max = THREAD_MAX_LIST
 
-    driver = get_web_driver()
+        driver = get_web_driver()
 
-    # ページ数取得のためにアクセス
-    driver.get(url)
+        # ページ数取得のためにアクセス
+        driver.get(url)
 
-    # ページが完全にロードされるまで待機
-    WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+        # ページが完全にロードされるまで待機
+        WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
 
-    # ページ数算出
-    path = '#totalitem_num'     # 該当件数
-    if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
-        tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
-        total_num = int(tmp.replace(',',''))
-        total_page = math.ceil(total_num / ITEM_COUNT_PER_PAGE)
+        # ページ数算出
+        path = '#totalitem_num'     # 該当件数
+        if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
+            tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
+            total_num = int(tmp.replace(',',''))
+            total_page = math.ceil(total_num / ITEM_COUNT_PER_PAGE)
 
-    base = total_page // thread_max
-    remainder = total_page % thread_max
-    page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
+        base = total_page // thread_max
+        remainder = total_page % thread_max
+        page_nums = [base + (1 if i < remainder else 0) for i in range(thread_max)]
 
-    start_pages = [1]
-    for i in range(1, len(page_nums)):
-        start_pages.append(start_pages[i-1] + page_nums[i-1])
+        start_pages = [1]
+        for i in range(1, len(page_nums)):
+            start_pages.append(start_pages[i-1] + page_nums[i-1])
 
-    # テンポラリファイルを削除
-    FILE_TMP_NAME = 'item_list'
-    FILE_TMP_EXT = 'csv'
+        # テンポラリファイルを削除
+        FILE_TMP_NAME = 'item_list'
+        FILE_TMP_EXT = 'csv'
 
-    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
-    file_pattern = os.path.join(base_dir, file_pattern)
-    delete_files = glob.glob(file_pattern)
-    for file in delete_files:
-        try:
-            os.remove(file)
-        except OSError as e:
-            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+        file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+        file_pattern = os.path.join(base_dir, file_pattern)
+        delete_files = glob.glob(file_pattern)
+        for file in delete_files:
+            try:
+                os.remove(file)
+            except OSError as e:
+                print_ex(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
 
-    # スレッド開始
-    threads = []
-    for i in range(thread_max):
-        if page_nums[i] > 0:
-            thread = Thread(target=get_item_list, args=(url, cols, i, start_pages[i], page_nums[i]))
-            threads.append(thread)
-            thread.start()    
+        # スレッド開始
+        threads = []
+        errors = []
+        lock = Lock()
+        for i in range(thread_max):
+            if page_nums[i] > 0:
+                thread = Thread(target=get_item_list, args=(url, cols, i, start_pages[i], page_nums[i], errors, lock))
+                threads.append(thread)
+                thread.start()    
 
-    # すべてのスレッドが終了するまで待機
-    for thread in threads:
-        thread.join()
+        # すべてのスレッドが終了するまで待機
+        for thread in threads:
+            thread.join()
 
-    # 収集したファイルを連結
-    df_concat = pd.DataFrame()
-    for i in range(thread_max):
-        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
-        file_path = os.path.join(base_dir, file_name)
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path,
-                dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
-            df_concat = pd.concat([df_concat, df], ignore_index=True)
+        # エラー確認
+        if errors:
+            for error in errors:
+                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+            raise
 
-    df_concat['No.'] = range(1, 1 + len(df_concat))
-    df_concat.to_csv(FILE_PATH_ITEM, index=False)
+        # 収集したファイルを連結
+        df_concat = pd.DataFrame()
+        for i in range(thread_max):
+            file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+            file_path = os.path.join(base_dir, file_name)
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path,
+                    dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
+                df_concat = pd.concat([df_concat, df], ignore_index=True)
+
+        df_concat['No.'] = range(1, 1 + len(df_concat))
+        df_concat.to_csv(FILE_PATH_ITEM, index=False)
+
+    except Exception as e:
+        print_ex(f'エラー発生: {e}')
+
     return                
 
-def get_item_list(url, cols, index, page_start, page_num):
+# 出品データ取得（リスト）タスク
+def get_item_list(url, cols, index, page_start, page_num, errors, lock):
 
     print_ex(f'出品データ(リスト)取得処理 開始 index={index+1}')
 
@@ -501,7 +528,7 @@ def get_item_list(url, cols, index, page_start, page_num):
         df_data = pd.DataFrame(columns=cols)
         data_list = []
         count = 0
-        
+
         for i in range(page_start, page_start + page_num):
 
             tmp = url[:-3]
@@ -581,82 +608,95 @@ def get_item_list(url, cols, index, page_start, page_num):
     except Exception as e:
         driver.quit()
         print_ex(f'エラー発生(index={index+1}): {str(e)}')
-        return False
+        with lock:
+            errors.append((index, str(e)))
+        return
 
     driver.quit()
     print_ex(f'出品データ(リスト)取得処理 終了 index={index+1}')
-
-    return True
+    return
 
 #--------------------------------------------------------------------------------
 # 出品データ取得（詳細）
 #--------------------------------------------------------------------------------
 def get_item_detail_multi(ss_url):
 
-    thread_max = THREAD_MAX_DETAIL
+    try:
+        thread_max = THREAD_MAX_DETAIL
 
-    # スプレッドシートから出品データ取得
-    data = get_ss_all_values(ss_url, ITEM_SHEET_NAME)
-    data_cols = data[0]
-    data_rows = data[1:]
-    df_data = pd.DataFrame(data_rows, columns=data_cols)
+        # スプレッドシートから出品データ取得
+        data = get_ss_all_values(ss_url, ITEM_SHEET_NAME)
+        data_cols = data[0]
+        data_rows = data[1:]
+        df_data = pd.DataFrame(data_rows, columns=data_cols)
 
-    split_size = int(np.ceil(len(df_data) / thread_max))
-    split_dfs = {}
+        split_size = int(np.ceil(len(df_data) / thread_max))
+        split_dfs = {}
 
-    for i in range(0, len(df_data), split_size):
-        start_row = i
-        split_df  = df_data.iloc[i:i + split_size].reset_index(drop=True)
-        split_dfs[start_row] = split_df
+        for i in range(0, len(df_data), split_size):
+            start_row = i
+            split_df  = df_data.iloc[i:i + split_size].reset_index(drop=True)
+            split_dfs[start_row] = split_df
 
-    # テンポラリファイルを削除
-    FILE_TMP_NAME = 'item_detail'
-    FILE_TMP_EXT = 'csv'          
-    file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
-    file_pattern = os.path.join(base_dir, file_pattern)
-    delete_files = glob.glob(file_pattern)
-    for file in delete_files:
-        try:
-            os.remove(file)
-        except OSError as e:
-            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+        # テンポラリファイルを削除
+        FILE_TMP_NAME = 'item_detail'
+        FILE_TMP_EXT = 'csv'          
+        file_pattern = f'{FILE_TMP_NAME}*.{FILE_TMP_EXT}'
+        file_pattern = os.path.join(base_dir, file_pattern)
+        delete_files = glob.glob(file_pattern)
+        for file in delete_files:
+            try:
+                os.remove(file)
+            except OSError as e:
+                print_ex(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
 
-    # スレッド開始
-    threads = []
-    for index, (start_row, split_df) in enumerate(split_dfs.items()):
-        thread = Thread(target=get_item_detail, args=(ss_url, index, start_row, split_df))
-        threads.append(thread)
-        thread.start()    
+        # スレッド開始
+        threads = []
+        errors = []
+        lock = Lock()
+        for index, (start_row, split_df) in enumerate(split_dfs.items()):
+            thread = Thread(target=get_item_detail, args=(ss_url, index, start_row, split_df, errors, lock))
+            threads.append(thread)
+            thread.start()    
 
-    # すべてのスレッドが終了するまで待機
-    for thread in threads:
-        thread.join()
+        # すべてのスレッドが終了するまで待機
+        for thread in threads:
+            thread.join()
 
-    # 収集したファイルを連結
-    df_concat = pd.DataFrame()
-    for i in range(thread_max):
-        file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
-        file_path = os.path.join(base_dir, file_name)
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path,
-                dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
-            df_concat = pd.concat([df_concat, df], ignore_index=True)
+        # エラー確認
+        if errors:
+            for error in errors:
+                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+            raise
 
-    df_concat['No.'] = range(1, 1 + len(df_concat))
-    df_concat.to_csv(FILE_PATH_DETAIL, index=False)
+        # 収集したファイルを連結
+        df_concat = pd.DataFrame()
+        for i in range(thread_max):
+            file_name = f'{FILE_TMP_NAME}_{i + 1}.{FILE_TMP_EXT}'
+            file_path = os.path.join(base_dir, file_name)
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path,
+                    dtype={'No.': int, 'ID': str}, parse_dates=['取得日時', '出品日'])
+                df_concat = pd.concat([df_concat, df], ignore_index=True)
 
-    # 型番のみファイル出力
-    df_model = df_concat[['ID', '商品名', 'ブランド', '型番']]
-    df_model['型番'] = df_model['型番'].str.split('<br>')
-    df_exploded = df_model.explode('型番')
-    df_exploded = df_exploded[df_exploded['型番'].notna()]
-    df_unique = df_exploded.drop_duplicates(subset=['ID', '型番'])
-    df_unique.to_csv(FILE_PATH_MODEL, index=False)
+        df_concat['No.'] = range(1, 1 + len(df_concat))
+        df_concat.to_csv(FILE_PATH_DETAIL, index=False)
+
+        # 型番のみファイル出力
+        df_model = df_concat[['ID', '商品名', 'ブランド', '型番']]
+        df_model['型番'] = df_model['型番'].str.split('<br>')
+        df_exploded = df_model.explode('型番')
+        df_exploded = df_exploded[df_exploded['型番'].notna()]
+        df_unique = df_exploded.drop_duplicates(subset=['ID', '型番'])
+        df_unique.to_csv(FILE_PATH_MODEL, index=False)
+
+    except Exception as e:
+        print_ex(f'エラー発生: {e}')
 
     return
 
-
-def get_item_detail(ss_url, index, start_row, df_data):
+# 出品データ取得（詳細）タスク
+def get_item_detail(ss_url, index, start_row, df_data, errors, lock):
 
     print_ex(f'出品データ(詳細)取得処理 開始 index={index+1}')
 
@@ -686,7 +726,7 @@ def get_item_detail(ss_url, index, start_row, df_data):
                     if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
                         tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
                         df_data.loc[i, '商品名'] = str(tmp)
-                    
+
                     path = '.n_item_grid li:nth-child(1) a'
                     if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
                         driver.find_element(By.CSS_SELECTOR, path).click()
@@ -853,13 +893,14 @@ def get_item_detail(ss_url, index, start_row, df_data):
 
     except Exception as e:
         driver.quit()
-        print_ex("エラー発生: " + str(e))
-        return False
-    
+        print_ex(f'エラー発生(index={index+1}): {str(e)}')
+        with lock:
+            errors.append((index, str(e)))
+        return
+
     driver.quit()
     print_ex(f'出品データ(詳細)取得処理 終了 index={index+1}')
-
-    return True
+    return
 
 #--------------------------------------------------------------------------------
 # 市場データ取得
@@ -889,12 +930,14 @@ def get_market_data_multi():
         try:
             os.remove(file)
         except OSError as e:
-            print(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
+            print_ex(f'ファイル "{file}" の削除中にエラーが発生しました: {e}')
 
     # スレッド開始
     threads = []
+    errors = []
+    lock = Lock()    
     for index, (start_row, split_df) in enumerate(split_dfs.items()):
-        thread = Thread(target=get_market_data, args=(index, split_df))
+        thread = Thread(target=get_market_data, args=(index, split_df, errors, lock))
         threads.append(thread)
         thread.start()    
 
@@ -913,11 +956,10 @@ def get_market_data_multi():
 
     df_concat['No.'] = range(1, 1 + len(df_concat))
     df_concat.to_csv(FILE_PATH_MARKET, index=False)
-
     return
 
-
-def get_market_data(index, df_data):
+# 市場データ取得タスク
+def get_market_data(index, df_data, errors, lock):
 
     print_ex(f'市場データ取得処理 開始 index={index+1}')
 
@@ -953,11 +995,13 @@ def get_market_data(index, df_data):
     except Exception as e:
         driver.quit()
         print_ex("エラー発生: " + str(e))
-        return False
-    
+        with lock:
+            errors.append((index, str(e)))
+        return
+
     driver.quit()
     print_ex(f'市場データ取得処理 終了 index={index+1}')
-    return True
+    return
 
 #--------------------------------------------------------------------------------
 # 出品データ→市場データ用リスト
@@ -1003,7 +1047,7 @@ def get_compare_order_of_item(ss_url):
         new_row = [f'{count}'] + [id] + ['未取得'] +  [''] + [''] + [f'https://www.buyma.com/item/{id}/'] + [''] * (len(data_item[0]) - 6)
         data_item.append(new_row)
         count += 1
-    
+
     set_ss_all_values(ss_url, '出品データ', data_item[1:])
 
 
