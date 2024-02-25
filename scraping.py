@@ -29,8 +29,9 @@ else:
 #--------------------------------------------------------------------------------
 THREAD_MAX_ORDER = 10
 THREAD_MAX_LIST = 10
-THREAD_MAX_DETAIL = 10
-THREAD_MAX_MARKET = 10
+THREAD_MAX_DETAIL = 20
+THREAD_MAX_MARKET = 20
+THREAD_RETRY_MAX = 5
 
 #--------------------------------------------------------------------------------
 # 処理状態
@@ -304,7 +305,7 @@ def get_order_data_multi(dt, url):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+                print_ex(f'[Th.{error[0]}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -322,12 +323,34 @@ def get_order_data_multi(dt, url):
         df_concat.to_csv(FILE_PATH_ORDER, index=False)
 
     except Exception as e:
-        print_ex(f'エラー発生: {e}')
+        print_ex(f'get_order_data_multi エラー発生: {e}')
 
     return
 
-# 注文実績取得タスク
+
+# 注文実績取得処理
 def get_order_data(dt, url, index, page_start, page_num, errors, lock):
+
+    for i in range(THREAD_RETRY_MAX):
+
+        result = get_order_data_worker(dt, url, index, page_start, page_num)
+
+        if result:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            return
+        else:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+
+    print_ex(f'[Th.{index+1}] リトライオーバー')
+
+    with lock:
+        errors.append(index)
+    
+    return
+
+
+# 注文実績取得タスク
+def get_order_data_worker(dt, url, index, page_start, page_num):
 
     print_ex(f'注文実績データ取得処理 開始 index={index+1}')
 
@@ -427,15 +450,11 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
     except Exception as e:
         driver.quit()
-        print_ex(f'エラー発生(index={index+1}): {str(e)}')
-        with lock:
-            errors.append((index, str(e)))
-        return
+        return False
 
     driver.quit()
     print_ex(f'注文実績データ取得処理 終了 index={index+1}')
-    return
-
+    return True
 
 #--------------------------------------------------------------------------------
 # 出品データ取得（リスト）
@@ -498,7 +517,7 @@ def get_item_list_multi(url, cols):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+                print_ex(f'[Th.{error[0]}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -519,8 +538,29 @@ def get_item_list_multi(url, cols):
 
     return                
 
+# 出品データ取得（リスト）
+def get_item_list(dt, url, index, page_start, page_num, errors, lock):
+
+    for i in range(THREAD_RETRY_MAX):
+        result = get_item_list_worker(dt, url, index, page_start, page_num)
+
+        if result:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            return
+        else:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+
+    print_ex(f'[Th.{index+1}] リトライオーバー')
+
+
+    with lock:
+        errors.append(index)
+    
+    return
+
+
 # 出品データ取得（リスト）タスク
-def get_item_list(url, cols, index, page_start, page_num, errors, lock):
+def get_item_list_worker(url, cols, index, page_start, page_num):
 
     print_ex(f'出品データ(リスト)取得処理 開始 index={index+1}')
 
@@ -610,13 +650,11 @@ def get_item_list(url, cols, index, page_start, page_num, errors, lock):
     except Exception as e:
         driver.quit()
         print_ex(f'エラー発生(index={index+1}): {str(e)}')
-        with lock:
-            errors.append((index, str(e)))
-        return
+        return False
 
     driver.quit()
     print_ex(f'出品データ(リスト)取得処理 終了 index={index+1}')
-    return
+    return True
 
 #--------------------------------------------------------------------------------
 # 出品データ取得（詳細）
@@ -668,7 +706,7 @@ def get_item_detail_multi(ss_url):
         # エラー確認
         if errors:
             for error in errors:
-                print_ex(f'スレッドindex={error[0]}: {error[1]}')
+                print_ex(f'[Th.{error[0]}]エラー発生')
             raise
 
         # 収集したファイルを連結
@@ -697,8 +735,28 @@ def get_item_detail_multi(ss_url):
 
     return
 
+
+# 出品データ取得（詳細）
+def get_item_detail(ss_url, index, start_row, split_df, errors, lock):
+
+    for i in range(THREAD_RETRY_MAX):
+        result = get_item_detail_worker(ss_url, index, start_row, split_df)
+
+        if result:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            return
+        else:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+
+    print_ex(f'[Th.{index+1}] リトライオーバー')
+
+    with lock:
+        errors.append(index)
+    
+    return
+
 # 出品データ取得（詳細）タスク
-def get_item_detail(ss_url, index, start_row, df_data, errors, lock):
+def get_item_detail_worker(ss_url, index, start_row, df_data):
 
     print_ex(f'出品データ(詳細)取得処理 開始 index={index+1}')
 
@@ -896,13 +954,11 @@ def get_item_detail(ss_url, index, start_row, df_data, errors, lock):
     except Exception as e:
         driver.quit()
         print_ex(f'エラー発生(index={index+1}): {str(e)}')
-        with lock:
-            errors.append((index, str(e)))
-        return
+        return False
 
     driver.quit()
     print_ex(f'出品データ(詳細)取得処理 終了 index={index+1}')
-    return
+    return True
 
 #--------------------------------------------------------------------------------
 # 市場データ取得
@@ -947,6 +1003,12 @@ def get_market_data_multi():
     for thread in threads:
         thread.join()
 
+    # エラー確認
+    if errors:
+        for error in errors:
+            print_ex(f'[Th.{error[0]}]エラー発生')
+        raise
+
     # 収集したファイルを連結
     df_concat = pd.DataFrame()
     for i in range(THREAD_MAX):
@@ -960,8 +1022,27 @@ def get_market_data_multi():
     df_concat.to_csv(FILE_PATH_MARKET, index=False)
     return
 
+# 市場データ取得
+def get_market_data(index, split_df, errors, lock):
+
+    for i in range(THREAD_RETRY_MAX):
+        result = get_market_data_worker(index, split_df)
+
+        if result:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
+            return
+        else:
+            print_ex(f'[Th.{index+1}] 試行 {i+1} 回目失敗')
+
+    print_ex(f'[Th.{index+1}] リトライオーバー')
+
+    with lock:
+        errors.append(index)
+    
+    return
+
 # 市場データ取得タスク
-def get_market_data(index, df_data, errors, lock):
+def get_market_data_worker(index, df_data):
 
     print_ex(f'市場データ取得処理 開始 index={index+1}')
 
@@ -997,13 +1078,11 @@ def get_market_data(index, df_data, errors, lock):
     except Exception as e:
         driver.quit()
         print_ex("エラー発生: " + str(e))
-        with lock:
-            errors.append((index, str(e)))
-        return
+        return False
 
     driver.quit()
     print_ex(f'市場データ取得処理 終了 index={index+1}')
-    return
+    return True
 
 #--------------------------------------------------------------------------------
 # 出品データ→市場データ用リスト
