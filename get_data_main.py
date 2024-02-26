@@ -22,6 +22,10 @@ def get_data_main():
         for url in MANAGE_SS_URL:
             # 外注管理リスト取得
             url_list = get_management_info(url)
+
+            for i in range(len(url_list)):
+                url_list[i]['index'] = i
+
             clients.append(url_list)
         
         queueInit = deque()
@@ -29,6 +33,7 @@ def get_data_main():
 
         while any(clients):
             for i, client in enumerate(clients):
+
                 for j, row in enumerate(client):
                     data = client.pop(0)
 
@@ -41,7 +46,7 @@ def get_data_main():
                         state == GetDataStep.INIT_RUN_ITEM.value or     # 初回取得中(出品データ)
                         state == GetDataStep.INIT_RUN_MARKET.value or   # 初回取得中(市場データ)
                         state == GetDataStep.INIT_ERROR.value):         # 初回取得エラー
-                        queueInit.append({'url': MANAGE_SS_URL[i], 'index': j, 'info': data})
+                        queueInit.append({'url': MANAGE_SS_URL[i], 'index': data['index'], 'info': data})
                         break
 
                     # 更新対象サーチ
@@ -52,7 +57,7 @@ def get_data_main():
                         state == GetDataStep.UPDATE_RUN_MARKET.value or # 更新中(市場データ)
                         state == GetDataStep.UPDATE_ERROR.value or      # 更新エラー
                         state == GetDataStep.UPDATE_DONE.value):        # 更新済
-                        queueUpdate.append({'url': MANAGE_SS_URL[i], 'index': j, 'info': data})
+                        queueUpdate.append({'url': MANAGE_SS_URL[i], 'index': data['index'], 'info': data})
                         break
 
         # 更新処理
