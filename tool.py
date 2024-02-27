@@ -53,3 +53,17 @@ def csv_to_array(filepath):
     
     return data
 
+#--------------------------------------------------------------------------------
+# 二次元配列の日付文字列の区切りをスラッシュに置換
+#--------------------------------------------------------------------------------
+def replace_date_separator(data, col_indexs):
+    
+    for row in data:
+        for index in col_indexs:
+            if index < len(row):
+                data_str = row[index]
+                if '-' in data_str:
+                    row[index] = data_str.replace('-', '/')
+
+    return data
+

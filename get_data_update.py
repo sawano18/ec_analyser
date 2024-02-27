@@ -83,14 +83,24 @@ def get_data_update(url, index, info):
             # 前回取得データの最新日時を取得
             data_latest = get_ss_all_values(url_sheet, ORDER_SHEET_NAME)
 
+            # 日付の区切りをスラッシュに置換
+            col_indexs = [1, 5, 6]   # 取得日時, 出品日, 成約日
+            data_latest = replace_date_separator(data_latest, col_indexs)
+
             if len(data_latest[0]) > 1:
                 data_latest = sorted(data_latest[1:], key=sort_key)
                 dt_latest = data_latest[-1][6]
-                dt_latest = datetime.strptime(dt_latest, '%Y-%m-%d').date()
+                dt_latest = datetime.strptime(dt_latest, '%Y/%m/%d').date()
 
             # CSVファイルから読込み
             data = csv_to_array(FILE_PATH_ORDER)
-            data_sorted = sorted(data, key=sort_key)
+
+            # 日付の区切りをスラッシュに置換
+            col_indexs = [1, 5, 6]   # 取得日時, 出品日, 成約日
+            data_rep = replace_date_separator(data, col_indexs)
+
+            # 成約日でソート
+            data_sorted = sorted(data_rep, key=sort_key)
 
             # 追加するデータを特定
             dt_today = datetime.now(tz).date()
@@ -98,7 +108,7 @@ def get_data_update(url, index, info):
 
             no_start = len(data_latest) + 1
             for j, r in enumerate(data_sorted):
-                date = datetime.strptime(r[6].split()[0], '%Y-%m-%d').date()
+                date = datetime.strptime(r[6].split()[0], '%Y/%m/%d').date()
                 if dt_latest < date and date <= dt_yesterday:
                     r[0] = no_start     # No.を続きから振る
                     no_start += 1

@@ -75,7 +75,13 @@ def get_data_init(url, index, info):
 
             # CSVファイルから読込み
             data = csv_to_array(FILE_PATH_ORDER)
-            data_sorted = sorted(data, key=sort_key)
+            
+            # 日付の区切りをスラッシュに置換
+            col_indexs = [1, 5, 6]   # 取得日時, 出品日, 成約日
+            data_rep = replace_date_separator(data, col_indexs)
+
+            # 成約日でソート
+            data_sorted = sorted(data_rep, key=sort_key)
 
             # 前日までのデータとする
             dt_today = datetime.now(tz).date()
@@ -83,7 +89,7 @@ def get_data_init(url, index, info):
             
             data_filtered = []
             for r in data_sorted:
-                date = datetime.strptime(r[6].split()[0], '%Y-%m-%d').date()
+                date = datetime.strptime(r[6].split()[0], '%Y/%m/%d').date()
                 if date <= dt_yesterday:
                     data_filtered.append(r)
 

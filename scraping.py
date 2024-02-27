@@ -147,7 +147,7 @@ ORDER_COLS = ['No.', '取得日時', '商品名', '商品URL', '商品ID', '出�
 
 # ソートキー(成約日=昇順 and No.=昇順)
 def sort_key(row):
-    sale_date = datetime.strptime(row[6], '%Y-%m-%d')
+    sale_date = datetime.strptime(row[6], '%Y/%m/%d')
     no = int(row[0])
     return (sale_date, no)
 
