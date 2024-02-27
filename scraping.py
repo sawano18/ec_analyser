@@ -57,8 +57,8 @@ class GetDataStep(Enum):
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
 if os.getenv('GITHUB_ACTIONS') == 'true':
-    tmp = os.getenv('MANAGE_SS_URL').strip().split('\r')
-    MANAGE_SS_URL = [url.strip(" '[]") for url in tmp if url.startswith('http')]
+    tmp = os.getenv('MANAGE_SS_URL').replace('\r\n', '\n').replace('\r', '\n')
+    MANAGE_SS_URL = tmp.strip().split('\n')
     print(MANAGE_SS_URL)
 else:
     with open('config.json', 'r', encoding='utf-8') as file:
