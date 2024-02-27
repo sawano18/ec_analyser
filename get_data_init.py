@@ -51,6 +51,9 @@ def get_data_init(url, index, info):
             # 開始時間を記録
             update_proc_start_time(url_manage, url_sheet, index)
 
+            # ステップ別処理時間クリア
+            clear_step_proc_time_init(url_manage, index)
+
             # ステップ移行
             state = GetDataStep.INIT_RUN_ORDER.value
 
@@ -220,6 +223,7 @@ def get_data_init(url, index, info):
         print_ex(f'エラー発生: {e}')
         state = GetDataStep.INIT_ERROR.value
         update_proc_status(url_manage, url_sheet, index, state)
+        set_error_detail(url_manage, index, e)
 
     print_ex('初回データ取得 終了')
     return

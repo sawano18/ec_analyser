@@ -55,9 +55,15 @@ class GetDataStep(Enum):
 #--------------------------------------------------------------------------------
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
+#MANAGE_SS_URL = [
+#    'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/',
+#    'https://docs.google.com/spreadsheets/d/1JZKyB-bRqIE1kcLbCHjTLg2XB-6OTaGgIMrEUQtW2Uc/'
+#]
+
+# 2024/02/27リリース
 MANAGE_SS_URL = [
-    'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/',
-    'https://docs.google.com/spreadsheets/d/1JZKyB-bRqIE1kcLbCHjTLg2XB-6OTaGgIMrEUQtW2Uc/'
+   'https://docs.google.com/spreadsheets/d/1B-ztB7pgVEt0FB1ndxpTd_Ydln-HTKSwvD3Y2zkQyRc/',
+   'https://docs.google.com/spreadsheets/d/1U8AYxEfKIOUq4GW3J_6FK7TueSCp23WJaImsJs_KtqA/'
 ]
 
 MANAGE_SS_NAME = '管理'
@@ -72,6 +78,7 @@ MANAGE_COL_INIT_TOTAL = 9
 MANAGE_COL_INIT_STEP = 10
 MANAGE_COL_UPDATE_TOTAL = 15
 MANAGE_COL_UPDATE_STEP = 16
+MANAGE_COL_ERROR = 20
 
 MANAGE_COLS = [
         'sheet_url',    # スプレッドURL
@@ -150,6 +157,7 @@ def sort_key(row):
 MARKET_SHEET_NAME = '市場データ'
 MARKET_MAX_PAGES = 30
 MARKET_MAX_RETRY = 5
+MARKET_DAY_SPAN = 7     # 取得頻度(日数)
 
 # 注文実績データCSVファイル
 FILE_PATH_MARKET = os.path.join(base_dir, 'market.csv')
@@ -209,11 +217,43 @@ def update_proc_time(url_manage, url_sheet, index, dt_start, dt_end):
     set_ss_value(url_sheet, OPE_SHEET_NAME, OPE_ROW_TIME, OPE_COL_VALUE, get_dt_diff_str(dt_start, dt_end))
 
 #--------------------------------------------------------------------------------
-# 処理時間出力（ステップ別）
+# ステップ処理時間出力
 #--------------------------------------------------------------------------------
 def update_step_proc_time(url_manage, index, col, dt_start, dt_end):
     # 外注総合管理シート
     set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, col, get_dt_diff_str(dt_start, dt_end))
+
+#--------------------------------------------------------------------------------
+# ステップ処理時間クリア(初回)
+#--------------------------------------------------------------------------------
+def clear_step_proc_time_init(url_manage, index):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_TOTAL, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_STEP + 0, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_STEP + 1, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_STEP + 2, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_STEP + 3, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_INIT_STEP + 4, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_ERROR, '')
+
+#--------------------------------------------------------------------------------
+# ステップ処理時間クリア(更新)
+#--------------------------------------------------------------------------------
+def clear_step_proc_time_update(url_manage, index):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_UPDATE_TOTAL, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_UPDATE_STEP + 0, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_UPDATE_STEP + 1, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_UPDATE_STEP + 2, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_UPDATE_STEP + 3, '')
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_ERROR, '')
+
+#--------------------------------------------------------------------------------
+# エラー詳細出力
+#--------------------------------------------------------------------------------
+def set_error_detail(url_manage, index, message):
+    # 外注総合管理シート
+    set_ss_value(url_manage, MANAGE_SS_NAME, MANAGE_ROW_START + index, MANAGE_COL_ERROR, message)
 
 
 #--------------------------------------------------------------------------------

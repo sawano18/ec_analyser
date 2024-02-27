@@ -27,6 +27,10 @@ def get_data_update(url, index, info):
         url_item = info['item_url']      # 出品データURL
         state = info['state']            # 状態
         ss_name = info['sheet_name']     # スプレッドシート名
+        
+        # 前回更新日時
+        update_dt_utc = datetime.strptime(info['update'], '%Y-%m-%d %H:%M:%S')
+        update_dt = tz.localize(update_dt_utc)
 
         # 状態が未取得, 取得中, エラーの場合に処理する
         if (state == GetDataStep.INIT_DONE.value or                     # 初回取得済
@@ -53,6 +57,9 @@ def get_data_update(url, index, info):
 
             # 開始時間を記録
             update_proc_start_time(url_manage, url_sheet, index)
+
+            # ステップ別処理時間クリア
+            clear_step_proc_time_update(url_manage, index)
 
             # ステップ移行
             state = GetDataStep.UPDATE_RUN_ORDER.value
@@ -188,7 +195,11 @@ def get_data_update(url, index, info):
             update_step_proc_time(url_manage, index, MANAGE_COL_UPDATE_STEP + 3 - 1, dt_start, datetime.now(tz))
 
             # ステップ移行
-            state = GetDataStep.UPDATE_RUN_MARKET.value
+            diff = datetime.now(tz) - update_dt
+            if diff > timedelta(days=MARKET_DAY_SPAN):
+                state = GetDataStep.UPDATE_RUN_MARKET.value
+            else:
+                state = GetDataStep.UPDATE_DONE.value
 
             print_ex('[St.3] get_data_update 出品データ取得(増分) 終了 ' + ss_name)
 
@@ -239,6 +250,7 @@ def get_data_update(url, index, info):
         print_ex(f'エラー発生: {e}')
         state = GetDataStep.UPDATE_ERROR.value
         update_proc_status(url_manage, url_sheet, index, state)
+        set_error_detail(url_manage, index, f'{e}')
 
     print_ex('データ更新 処理終了')
     return
