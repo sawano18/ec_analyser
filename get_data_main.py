@@ -64,11 +64,13 @@ def get_data_main():
         while queueUpdate:
             item = queueUpdate.popleft()
             get_data_update(item['url'], item['index'], item['info'])
+            time.sleep(60)
 
         # 初期化処理
         while queueInit:
             item = queueInit.popleft()
             get_data_init(item['url'], item['index'], item['info'])
+            time.sleep(60)
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
