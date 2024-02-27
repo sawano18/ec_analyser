@@ -260,14 +260,13 @@ def get_data_update(url, index, info):
         print_ex(f'エラー発生: {e}')
         state = GetDataStep.UPDATE_ERROR.value
         update_proc_status(url_manage, url_sheet, index, state)
-        set_error_detail(url_manage, index, f'{e}')
 
     print_ex('データ更新 処理終了')
     return
 
 def main():
+    print('テスト実行')
     #get_data_update()
-    return
 
 if __name__ == "__main__":
     main()

@@ -74,6 +74,7 @@ def get_data_main():
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')
+        set_error_detail(item['url'], item['index'], f'{e}')
 
     print_ex('データ取得メイン処理 終了')
     return

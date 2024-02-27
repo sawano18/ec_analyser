@@ -13,6 +13,7 @@ from threading import Thread, Lock
 import glob
 import time
 from selenium.webdriver.support.ui import WebDriverWait
+import json
 
 
 # パス関連
@@ -55,16 +56,13 @@ class GetDataStep(Enum):
 #--------------------------------------------------------------------------------
 # 外注総合管理ツール
 #--------------------------------------------------------------------------------
-#MANAGE_SS_URL = [
-#    'https://docs.google.com/spreadsheets/d/1cmg-EXgaCVdZbm10KTr4md_i7pec79-5-RUIihOmBfg/',
-#    'https://docs.google.com/spreadsheets/d/1JZKyB-bRqIE1kcLbCHjTLg2XB-6OTaGgIMrEUQtW2Uc/'
-#]
-
-# 2024/02/27リリース
-MANAGE_SS_URL = [
-   'https://docs.google.com/spreadsheets/d/1B-ztB7pgVEt0FB1ndxpTd_Ydln-HTKSwvD3Y2zkQyRc/',
-   'https://docs.google.com/spreadsheets/d/1U8AYxEfKIOUq4GW3J_6FK7TueSCp23WJaImsJs_KtqA/'
-]
+if os.getenv('GITHUB_ACTIONS') == 'true':
+    MANAGE_SS_URL = os.getenv('MANAGE_SS_URL').split('\n')
+    print(MANAGE_SS_URL)
+else:
+    with open('config.json', 'r', encoding='utf-8') as file:
+        data = json.load(file)
+    MANAGE_SS_URL = data['manage_ss_url']
 
 MANAGE_SS_NAME = '管理'
 

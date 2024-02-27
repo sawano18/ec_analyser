@@ -229,14 +229,14 @@ def get_data_init(url, index, info):
         print_ex(f'エラー発生: {e}')
         state = GetDataStep.INIT_ERROR.value
         update_proc_status(url_manage, url_sheet, index, state)
-        set_error_detail(url_manage, index, e)
 
     print_ex('初回データ取得 終了')
     return
 
 
 def main():
-    get_data_init()
+    print('テスト実行')
+    #get_data_init()
 
 
 if __name__ == "__main__":
