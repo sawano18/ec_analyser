@@ -372,7 +372,7 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
     for i in range(THREAD_RETRY_MAX):
 
-        result = get_order_data_worker(dt, url, index, page_start, page_num)
+        result = get_order_data_worker(dt, url, index, page_start, page_num, lock))
 
         if result:
             print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
@@ -389,13 +389,13 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
 
 # 注文実績取得タスク
-def get_order_data_worker(dt, url, index, page_start, page_num):
+def get_order_data_worker(dt, url, index, page_start, page_num, lock)):
 
     print_ex(f'[Th.{index+1}] 注文実績データ取得処理 開始')
 
     try:
         # ChromeDriver
-        driver = get_web_driver()
+        driver = get_web_driver(lock)
 
         df_data = pd.DataFrame(columns=ORDER_COLS)
         data_list = []
@@ -581,7 +581,7 @@ def get_item_list_multi(url, cols):
 def get_item_list(dt, url, index, page_start, page_num, errors, lock):
 
     for i in range(THREAD_RETRY_MAX):
-        result = get_item_list_worker(dt, url, index, page_start, page_num)
+        result = get_item_list_worker(dt, url, index, page_start, page_num, lock)
 
         if result:
             print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
@@ -599,12 +599,12 @@ def get_item_list(dt, url, index, page_start, page_num, errors, lock):
 
 
 # 出品データ取得（リスト）タスク
-def get_item_list_worker(url, cols, index, page_start, page_num):
+def get_item_list_worker(url, cols, index, page_start, page_num, lock):
 
     print_ex(f'[Th.{index+1}] 出品データ(リスト)取得処理 開始')
 
     try:
-        driver = get_web_driver()
+        driver = get_web_driver(lock)
 
         df_data = pd.DataFrame(columns=cols)
         data_list = []
@@ -779,7 +779,7 @@ def get_item_detail_multi(ss_url):
 def get_item_detail(ss_url, index, start_row, split_df, errors, lock):
 
     for i in range(THREAD_RETRY_MAX):
-        result = get_item_detail_worker(ss_url, index, start_row, split_df)
+        result = get_item_detail_worker(ss_url, index, start_row, split_df, lock)
 
         if result:
             print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
@@ -795,12 +795,12 @@ def get_item_detail(ss_url, index, start_row, split_df, errors, lock):
     return
 
 # 出品データ取得（詳細）タスク
-def get_item_detail_worker(ss_url, index, start_row, df_data):
+def get_item_detail_worker(ss_url, index, start_row, df_data, lock):
 
     print_ex(f'[Th.{index+1}] 出品データ(詳細)取得処理 開始')
 
     try:
-        driver = get_web_driver()
+        driver = get_web_driver(lock)
         print_ex(f'[Th.{index+1}] Webドライバ初期化 完了')
 
         for i in range(df_data.shape[0]):
@@ -1069,7 +1069,7 @@ def get_market_data_multi():
 def get_market_data(index, split_df, errors, lock):
 
     for i in range(THREAD_RETRY_MAX):
-        result = get_market_data_worker(index, split_df)
+        result = get_market_data_worker(index, split_df, lock)
 
         if result:
             print_ex(f'[Th.{index+1}] 試行 {i+1}回目成功')
@@ -1085,12 +1085,12 @@ def get_market_data(index, split_df, errors, lock):
     return
 
 # 市場データ取得タスク
-def get_market_data_worker(index, df_data):
+def get_market_data_worker(index, df_data, lock):
 
     print_ex(f'[Th.{index+1}] 市場データ取得処理 開始')
 
     try:
-        driver = get_web_driver()
+        driver = get_web_driver(lock)
 
         for i in range(df_data.shape[0]):
 
