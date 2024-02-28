@@ -503,7 +503,8 @@ def get_item_list_multi(url, cols):
     try:
         thread_max = THREAD_MAX_LIST
 
-        driver = get_web_driver()
+        lock = Lock()
+        driver = get_web_driver(lock)
 
         # ページ数取得のためにアクセス
         driver.get(url)
@@ -542,7 +543,6 @@ def get_item_list_multi(url, cols):
         # スレッド開始
         threads = []
         errors = []
-        lock = Lock()
         for i in range(thread_max):
             if page_nums[i] > 0:
                 thread = Thread(target=get_item_list, args=(url, cols, i, start_pages[i], page_nums[i], errors, lock))
@@ -590,7 +590,6 @@ def get_item_list(dt, url, index, page_start, page_num, errors, lock):
             print_ex(f'[Th.{index+1}] 試行 {i+1}回目失敗')
 
     print_ex(f'[Th.{index+1}] リトライオーバー')
-
 
     with lock:
         errors.append(index)
