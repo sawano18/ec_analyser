@@ -46,6 +46,11 @@ def get_data_main():
                         state == GetDataStep.INIT_RUN_ITEM.value or     # 初回取得中(出品データ)
                         state == GetDataStep.INIT_RUN_MARKET.value or   # 初回取得中(市場データ)
                         state == GetDataStep.INIT_ERROR.value):         # 初回取得エラー
+
+                        # 出品データ取得中から再開の場合は出品リスト取得から
+                        if ( state == GetDataStep.INIT_RUN_CHECK.value or state == GetDataStep.INIT_RUN_ITEM.value):
+                            state = GetDataStep.INIT_RUN_LIST.value
+
                         queueInit.append({'url': MANAGE_SS_URL[i], 'index': data['index'], 'info': data})
                         break
 
@@ -57,6 +62,11 @@ def get_data_main():
                         state == GetDataStep.UPDATE_RUN_MARKET.value or # 更新中(市場データ)
                         state == GetDataStep.UPDATE_ERROR.value or      # 更新エラー
                         state == GetDataStep.UPDATE_DONE.value):        # 更新済
+
+                        # 出品データ取得中から再開の場合は出品リスト取得から
+                        if state == GetDataStep.UPDATE_RUN_ITEM.value:
+                            state = GetDataStep.UPDATE_RUN_LIST.value
+
                         queueUpdate.append({'url': MANAGE_SS_URL[i], 'index': data['index'], 'info': data})
                         break
 
