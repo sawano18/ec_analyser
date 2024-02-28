@@ -801,10 +801,12 @@ def get_item_detail_worker(ss_url, index, start_row, df_data):
 
     try:
         driver = get_web_driver()
+        print_ex(f'[Th.{index+1}] Webドライバ初期化 完了')
 
         for i in range(df_data.shape[0]):
 
             if df_data['出品'][i] == '削除' or df_data['出品'][i] == '出品中':
+                print_ex(f'[Th.{index+1}] 出品データ(詳細) 取得スキップ: {i + 1} / {df_data.shape[0]}')
                 continue
 
             # URLアクセス
@@ -982,6 +984,8 @@ def get_item_detail_worker(ss_url, index, start_row, df_data):
 
             # 取得日時
             df_data.loc[i, '取得日時'] = get_dt_str()
+
+            print_ex(f'[Th.{index+1}] 出品データ(詳細) 取得完了: {i + 1} / {df_data.shape[0]}')
 
         # テンポラリファイルへ出力
         FILE_TMP_NAME = 'item_detail'
