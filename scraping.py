@@ -372,7 +372,7 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
     for i in range(THREAD_RETRY_MAX):
 
-        result = get_order_data_worker(dt, url, index, page_start, page_num, lock))
+        result = get_order_data_worker(dt, url, index, page_start, page_num, lock)
 
         if result:
             print_ex(f'[Th.{index+1}] 試行 {i+1} 回目成功')
@@ -389,7 +389,7 @@ def get_order_data(dt, url, index, page_start, page_num, errors, lock):
 
 
 # 注文実績取得タスク
-def get_order_data_worker(dt, url, index, page_start, page_num, lock)):
+def get_order_data_worker(dt, url, index, page_start, page_num, lock):
 
     print_ex(f'[Th.{index+1}] 注文実績データ取得処理 開始')
 
