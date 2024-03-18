@@ -30,7 +30,7 @@ else:
 #--------------------------------------------------------------------------------
 THREAD_MAX_ORDER = 10
 THREAD_MAX_LIST = 10
-THREAD_MAX_DETAIL = 40
+THREAD_MAX_DETAIL = 30
 THREAD_MAX_PRICE = 30
 THREAD_MAX_MARKET = 30
 THREAD_RETRY_MAX = 5
