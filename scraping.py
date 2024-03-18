@@ -30,9 +30,9 @@ else:
 #--------------------------------------------------------------------------------
 THREAD_MAX_ORDER = 10
 THREAD_MAX_LIST = 10
-THREAD_MAX_DETAIL = 20
-THREAD_MAX_PRICE = 20    #★デバッグ
-THREAD_MAX_MARKET = 20
+THREAD_MAX_DETAIL = 40
+THREAD_MAX_PRICE = 30
+THREAD_MAX_MARKET = 30
 THREAD_RETRY_MAX = 5
 
 #--------------------------------------------------------------------------------
@@ -1284,7 +1284,7 @@ def get_market_data_worker(index, df_data, lock):
             if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
                 tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
                 tmp = tmp.replace(',', '')
-                df_data.loc[i, '出品数'] = tmp
+                df_data.loc[i, '出品数'] = int(tmp)
             
             df_data.to_csv(FILE_PATH_MARKET, index=False)
 
