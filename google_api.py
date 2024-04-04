@@ -2,8 +2,8 @@ import os
 import time
 import gspread
 from datetime import datetime
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from tool import print_ex
 
 
@@ -64,7 +64,7 @@ def set_ss_all_values(url, sheet, data, start_row=2, start_col=1):
         ws.update(start_a1, data, value_input_option="USER_ENTERED")
         
     except Exception as e:
-        print(f'エラー発生: {e}')
+        print_ex(f'エラー発生: {e}')
         raise
 
     #print_ex(f'スプレッドシート更新 終了')
@@ -117,9 +117,10 @@ def set_ss_value(url, sheet, row, col, data):
         api_call_check()
         cell_label = gspread.utils.rowcol_to_a1(row, col)
         ws.update(cell_label, [[data]], value_input_option="USER_ENTERED")
+        print_ex(f'set_ss_value sheet={sheet}, cell_label={cell_label}, data={[[data]]}')
         
     except Exception as e:
-        print(f'エラー発生: {e}')
+        print_ex(f'エラー発生: {e}')
         raise
 
     #print_ex(f'スプレッドシート更新 終了')
@@ -147,7 +148,7 @@ def get_ss_value(url, sheet, row, col):
         data = ws.cell(row, col).value
         
     except Exception as e:
-        print(f'エラー発生: {e}')
+        print_ex(f'エラー発生: {e}')
         raise
 
     #print_ex(f'スプレッドシート更新 終了')
@@ -181,14 +182,7 @@ def get_credentials():
 
     try:
         # OAuth認証
-        if os.path.exists(FILE_PATH_TOKEN):
-            credentials = Credentials.from_authorized_user_file(FILE_PATH_TOKEN, SCOPES)
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(FILE_PATH_CREDENTIAL, SCOPES)
-            credentials = flow.run_local_server(port=8080)
-
-            with open(FILE_PATH_TOKEN, 'w') as token:
-                token.write(credentials.to_json())
+        credentials = service_account.Credentials.from_service_account_file(FILE_PATH_CREDENTIAL, scopes=SCOPES)
 
     except Exception as e:
         print_ex(f'エラー発生: {e}')

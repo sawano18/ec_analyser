@@ -79,7 +79,8 @@ MANAGE_COL_INIT_TOTAL = 9
 MANAGE_COL_INIT_STEP = 10
 MANAGE_COL_UPDATE_TOTAL = 15
 MANAGE_COL_UPDATE_STEP = 16
-MANAGE_COL_ERROR = 20
+MANAGE_COL_ERROR = 21
+MANAGE_COL_UPDATE_DT = 22
 
 MANAGE_COLS = [
         'sheet_url',    # スプレッドURL
@@ -923,17 +924,22 @@ def get_item_detail_worker(ss_url, index, start_row, df_data, lock):
                     df_data.loc[i, 'お気に入りアイテム登録'] = str(tmp)
 
                 # 価格
-                tmp = ''
-                path = '#abtest_display_pc'
+                path = '.js-item-price p'
                 if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
-                    tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
-                else:
-                    path = '#priceWrap .price_dd .fab-typo-midium'
-                    if len(driver.find_elements(By.CSS_SELECTOR, path)) > 0:
-                        tmp = driver.find_element(By.CSS_SELECTOR, path).text.strip()
-                tmp = tmp.replace('¥', '')
-                tmp = tmp.replace(',', '')
-                df_data.loc[i, '価格'] = str(tmp)
+                    elems = driver.find_elements(By.CSS_SELECTOR, path)
+
+                    next_hit = False
+                    for elem in elems:
+                        if next_hit:
+                            tmp_dd = elem.text.strip()
+                            tmp = tmp_dd.replace('¥', '')
+                            tmp = tmp.replace(',', '')
+                            df_data.loc[i, '価格'] = str(tmp)
+                            break
+
+                        tmp_dt = elem.text.strip()
+                        if tmp_dt == '価格':
+                            next_hit = True
 
                 # タグ1
                 # タグ2
